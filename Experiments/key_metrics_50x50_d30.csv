@@ -1,0 +1,6 @@
+Algorithm,Time (ms),Nodes Visited,Path Optimality (1=shortest)
+WeightedA*,1.03,323,1.19
+A*,1.58,509,1.0
+BFS,2.25,1645,1.0
+Dijkstra,4.82,1645,1.0
+Greedy,24.88,1997,1.0
