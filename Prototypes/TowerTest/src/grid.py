@@ -12,7 +12,7 @@ def load_grid(filename: str) -> list[list[int]]:
     return grid
 
 # default grid at boot
-GRID_MAP: list[list[int]] = load_grid('level1.json')
+GRID_MAP: list[list[int]] = load_grid('Level5Path.json')
 
 def walkable(x: int, y: int) -> bool:
     return 0 <= x < GRID_W and 0 <= y < GRID_H and GRID_MAP[y][x] == 0
