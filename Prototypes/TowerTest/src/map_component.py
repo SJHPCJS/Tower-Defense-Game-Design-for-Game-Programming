@@ -4,26 +4,39 @@ from settings import *
 from grid import GRID_MAP
 
 class MapComponent:
-    def __init__(self):
+    def __init__(self, grid=None, spawn=(0,0), home=(GRID_W-2, GRID_H-2)):
+        self.grid  = grid if grid is not None else GRID_MAP
+        self.spawn = spawn
+        self.home  = home
         self.surface = pygame.Surface((GRID_W*GRID_SIZE, GRID_H*GRID_SIZE))
-        self._load_tiles()
-        self._build()
+        self._load_imgs(); self._draw()
 
-    def _load_tiles(self):
-        assets = Path(__file__).parent.parent / "assets" / "tiles"
-        grass_img = pygame.image.load(assets / "grass.png")
-        self.grass = pygame.transform.scale(grass_img, (GRID_SIZE, GRID_SIZE))
-        self.path  = pygame.Surface((GRID_SIZE, GRID_SIZE))
-        self.path.fill(WHITE)
+    def _load_imgs(self):
+        assets = Path(__file__).parent.parent / 'assets' / 'tiles'
+        self.img = {
+            0: pygame.transform.scale(pygame.image.load(assets/'path.png'),
+                                      (GRID_SIZE, GRID_SIZE)),
+            1: pygame.transform.scale(pygame.image.load(assets/'grass.png'),
+                                      (GRID_SIZE, GRID_SIZE)),
+        }
 
-    def _build(self):
-        for y, row in enumerate(GRID_MAP):
-            for x, cell in enumerate(row):
-                img = self.grass if cell else self.path
-                px, py = x*GRID_SIZE, y*GRID_SIZE
-                self.surface.blit(img, (px, py))
-                pygame.draw.rect(self.surface, BLACK,
-                                 (px, py, GRID_SIZE, GRID_SIZE), 1)
+    def _draw(self):
+        # tiles
+        for y,row in enumerate(self.grid):
+            for x,t in enumerate(row):
+                self.surface.blit(self.img[t], (x*GRID_SIZE, y*GRID_SIZE))
+        # markers
+        sx, sy = self.spawn
+        hx, hy = self.home
+        pygame.draw.rect(self.surface, YELLOW,
+                         (sx*GRID_SIZE, sy*GRID_SIZE, GRID_SIZE, GRID_SIZE))
+        pygame.draw.rect(self.surface, PINK,
+                         (hx*GRID_SIZE, hy*GRID_SIZE, GRID_SIZE, GRID_SIZE))
 
-    def draw(self, dest):
-        dest.blit(self.surface, (0, UI_HEIGHT))
+    def set_grid(self, new_grid):
+        self.grid = new_grid
+        self.surface.fill((0,0,0))
+        self._draw()
+
+    def draw(self, target):
+        target.blit(self.surface, (0, UI_HEIGHT))

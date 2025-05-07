@@ -16,6 +16,8 @@ GREEN     = (0, 255,   0)
 RED       = (255, 0,   0)
 BLUE      = (0,   0, 255)
 BG_COLOUR = (173, 216, 230)
+YELLOW = (255, 210,   0)
+PINK   = (255,  90, 140)
 
 # tower definitions
 TOWER_TYPES = [

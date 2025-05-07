@@ -110,7 +110,7 @@ for _ in range(100):
     grid = generate_grid(w, h, density, rng)
     if bfs(grid)[0] is not None:
         break
-else:                        # 极端 fallback
+else:
     grid = [[0]*w for _ in range(h)]
 
 algos = {
