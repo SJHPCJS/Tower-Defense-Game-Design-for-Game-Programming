@@ -16,8 +16,16 @@ GREEN     = (0, 255,   0)
 RED       = (255, 0,   0)
 BLUE      = (0,   0, 255)
 BG_COLOUR = (173, 216, 230)
+BG_COLOR = BG_COLOUR  # Alias for compatibility
 YELLOW = (255, 210,   0)
 PINK   = (255,  90, 140)
+
+# Menu colors
+FOREST_GREEN = (34, 139, 34)
+DARK_GREEN = (0, 100, 0)
+LIGHT_GREEN = (144, 238, 144)
+BROWN = (139, 69, 19)
+CREAM = (245, 245, 220)
 
 
 # tower definitions
