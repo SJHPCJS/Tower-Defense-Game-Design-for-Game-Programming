@@ -4,10 +4,19 @@ import pygame
 GRID_SIZE      = 40
 GRID_W, GRID_H = 20, 15
 
-UI_HEIGHT   = 80
+# Increase UI height for a richer interface
+UI_HEIGHT   = 120
 SCREEN_W    = GRID_W * GRID_SIZE
 SCREEN_H    = GRID_H * GRID_SIZE + UI_HEIGHT
 FPS         = 60
+
+# Minimum window size
+MIN_SCREEN_W = 800
+MIN_SCREEN_H = 600
+
+# Default window size (adjustable)
+DEFAULT_SCREEN_W = max(SCREEN_W, MIN_SCREEN_W)
+DEFAULT_SCREEN_H = max(SCREEN_H, MIN_SCREEN_H)
 
 # colours
 WHITE     = (255, 255, 255)
@@ -19,6 +28,8 @@ BG_COLOUR = (173, 216, 230)
 BG_COLOR = BG_COLOUR  # Alias for compatibility
 YELLOW = (255, 210,   0)
 PINK   = (255,  90, 140)
+GOLD = (255, 215, 0)
+SILVER = (192, 192, 192)
 
 # Menu colors
 FOREST_GREEN = (34, 139, 34)
@@ -27,21 +38,125 @@ LIGHT_GREEN = (144, 238, 144)
 BROWN = (139, 69, 19)
 CREAM = (245, 245, 220)
 
+# UI Colors
+UI_DARK_BG = (30, 30, 30)
+UI_MID_BG = (45, 45, 45)
+UI_LIGHT_BG = (60, 60, 60)
+UI_ACCENT = (70, 130, 180)
+UI_SUCCESS = (40, 180, 99)
+UI_WARNING = (255, 193, 7)
+UI_DANGER = (220, 53, 69)
+
+# Game settings
+STARTING_MONEY = 100
+TOWER_COSTS = {
+    'Fast': 20,
+    'Strong': 40,
+    'Balanced': 30
+}
+WAVE_REWARD = 50
+KILL_REWARD = 1
+
+# Enemy colors
+ENEMY_COLORS = {
+    'normal': BLUE,
+    'fast': GREEN,
+    'tank': RED
+}
+
+# Button colors
+BUTTON_COLORS = {
+    'normal': FOREST_GREEN,
+    'hover': LIGHT_GREEN,
+    'pressed': DARK_GREEN
+}
 
 # tower definitions
 TOWER_TYPES = [
-    {'name':'Fast',     'damage':10, 'rof':0.3, 'color':(200,200,255)},
-    {'name':'Strong',   'damage':30, 'rof':1.2, 'color':(255,200,200)},
-    {'name':'Balanced', 'damage':20, 'rof':0.6, 'color':(200,255,200)},
+    {'name':'Fast',     'damage':10, 'rof':0.3, 'color':(200,200,255), 'description': 'High attack speed, low damage'},
+    {'name':'Strong',   'damage':30, 'rof':1.2, 'color':(255,200,200), 'description': 'High damage, slow attack speed'},
+    {'name':'Balanced', 'damage':20, 'rof':0.6, 'color':(200,255,200), 'description': 'Balanced damage and speed'},
 ]
 
 
-def grid_to_px(gx: int, gy: int) -> tuple[int,int]:
-    return gx * GRID_SIZE, UI_HEIGHT + gy * GRID_SIZE
+def grid_to_px(gx: int, gy: int, screen_width=None, screen_height=None) -> tuple[int,int]:
+    """Convert grid coordinates to pixel coordinates, with optional screen scaling"""
+    if screen_width is None:
+        screen_width = DEFAULT_SCREEN_W
+    if screen_height is None:
+        screen_height = DEFAULT_SCREEN_H
+    
+    # Calculate scaling factors
+    game_area_height = screen_height - UI_HEIGHT
+    scale_x = screen_width / (GRID_W * GRID_SIZE)
+    scale_y = game_area_height / (GRID_H * GRID_SIZE)
+    scale = min(scale_x, scale_y)  # Maintain aspect ratio
+    
+    # Calculate offset to center the game area
+    scaled_width = GRID_W * GRID_SIZE * scale
+    scaled_height = GRID_H * GRID_SIZE * scale
+    offset_x = (screen_width - scaled_width) // 2
+    offset_y = UI_HEIGHT + (game_area_height - scaled_height) // 2
+    
+    return int(gx * GRID_SIZE * scale + offset_x), int(gy * GRID_SIZE * scale + offset_y)
+
+
+def px_to_grid(px: int, py: int, screen_width=None, screen_height=None) -> tuple[int,int]:
+    """Convert pixel coordinates to grid coordinates"""
+    if screen_width is None:
+        screen_width = DEFAULT_SCREEN_W
+    if screen_height is None:
+        screen_height = DEFAULT_SCREEN_H
+    
+    game_area_height = screen_height - UI_HEIGHT
+    scale_x = screen_width / (GRID_W * GRID_SIZE)
+    scale_y = game_area_height / (GRID_H * GRID_SIZE)
+    scale = min(scale_x, scale_y)
+    
+    scaled_width = GRID_W * GRID_SIZE * scale
+    scaled_height = GRID_H * GRID_SIZE * scale
+    offset_x = (screen_width - scaled_width) // 2
+    offset_y = UI_HEIGHT + (game_area_height - scaled_height) // 2
+    
+    # Adjust for UI offset and scaling
+    adjusted_x = (px - offset_x) / scale
+    adjusted_y = (py - offset_y) / scale
+    
+    gx = int(adjusted_x // GRID_SIZE)
+    gy = int(adjusted_y // GRID_SIZE)
+    
+    return gx, gy
+
+
+def get_scaled_grid_size(screen_width=None, screen_height=None) -> int:
+    """Get the scaled grid size for current screen dimensions"""
+    if screen_width is None:
+        screen_width = DEFAULT_SCREEN_W
+    if screen_height is None:
+        screen_height = DEFAULT_SCREEN_H
+    
+    game_area_height = screen_height - UI_HEIGHT
+    scale_x = screen_width / (GRID_W * GRID_SIZE)
+    scale_y = game_area_height / (GRID_H * GRID_SIZE)
+    scale = min(scale_x, scale_y)
+    
+    return int(GRID_SIZE * scale)
 
 
 pygame.init()
-screen = pygame.display.set_mode((SCREEN_W, SCREEN_H))
+# Create a resizable window
+screen = pygame.display.set_mode((DEFAULT_SCREEN_W, DEFAULT_SCREEN_H), 
+                                pygame.RESIZABLE | pygame.DOUBLEBUF)
 clock  = pygame.time.Clock()
-pygame.display.set_caption("Tower Defense")
+pygame.display.set_caption("Forest Guard - Tower Defense")
 FONT = pygame.font.SysFont(None, 24)
+
+# Fonts dictionary for different UI elements
+FONTS = {
+    'title': pygame.font.SysFont('Arial', 72, bold=True),
+    'subtitle': pygame.font.SysFont('Arial', 24),
+    'button': pygame.font.SysFont('Arial', 24, bold=True),
+    'hud': pygame.font.SysFont('Arial', 20),
+    'small': pygame.font.SysFont('Arial', 16),
+    'tiny': pygame.font.SysFont('Arial', 12)
+}

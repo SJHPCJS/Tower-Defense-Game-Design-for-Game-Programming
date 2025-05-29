@@ -16,8 +16,8 @@ def load_grid(filename: str) -> list[list[int]]:
         raise ValueError("Level size must be 20×15")
     return grid
 
-# default grid at boot
-GRID_MAP: list[list[int]] = load_grid('Level5Path.json')
+# Create a default empty grid (all grass)
+GRID_MAP: list[list[int]] = [[1 for _ in range(GRID_W)] for _ in range(GRID_H)]
 
 def update_grid_map(new_grid: list[list[int]]):
     """Update the global GRID_MAP with new grid data"""

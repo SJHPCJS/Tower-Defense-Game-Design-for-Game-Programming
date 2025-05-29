@@ -18,7 +18,14 @@ def heuristic(a, b):
     # Manhattan distance
     return abs(a.x - b[0]) + abs(a.y - b[1])
 
-def a_star(start_xy, end_xy):
+def walkable(x, y, grid):
+    return 0 <= x < GRID_W and 0 <= y < GRID_H and grid[y][x] == 0
+
+def a_star(start_xy, end_xy, grid=None):
+    if grid is None:
+        from grid import GRID_MAP
+        grid = GRID_MAP
+        
     # initialize nodes
     nodes = [[Node(x, y) for y in range(GRID_H)] for x in range(GRID_W)]
     sx, sy = start_xy
@@ -51,7 +58,7 @@ def a_star(start_xy, end_xy):
 
         for dx, dy in neighbors:
             nx, ny = current.x + dx, current.y + dy
-            if not walkable(nx, ny) or (nx, ny) in closed:
+            if not walkable(nx, ny, grid) or (nx, ny) in closed:
                 continue
 
             neighbor = nodes[nx][ny]

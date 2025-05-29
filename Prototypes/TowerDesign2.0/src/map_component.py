@@ -8,35 +8,74 @@ class MapComponent:
         self.grid  = grid if grid is not None else GRID_MAP
         self.spawn = spawn
         self.home  = home
-        self.surface = pygame.Surface((GRID_W*GRID_SIZE, GRID_H*GRID_SIZE))
-        self._load_imgs(); self._draw()
+        self._load_imgs()
 
     def _load_imgs(self):
         assets = Path(__file__).parent.parent / 'assets' / 'tiles'
-        self.img = {
-            0: pygame.transform.scale(pygame.image.load(assets/'path.png'),
-                                      (GRID_SIZE, GRID_SIZE)),
-            1: pygame.transform.scale(pygame.image.load(assets/'grass.png'),
-                                      (GRID_SIZE, GRID_SIZE)),
+        self.base_imgs = {
+            0: pygame.image.load(assets/'path.png'),
+            1: pygame.image.load(assets/'grass.png'),
         }
 
-    def _draw(self):
-        # tiles
-        for y,row in enumerate(self.grid):
-            for x,t in enumerate(row):
-                self.surface.blit(self.img[t], (x*GRID_SIZE, y*GRID_SIZE))
-        # markers
+    def set_spawn_and_home(self, spawn, home):
+        """Set the spawn and home positions"""
+        self.spawn = spawn
+        self.home = home
+
+    def _draw(self, screen_w, screen_h):
+        # Use the latest GRID_MAP data
+        from grid import GRID_MAP
+        self.grid = GRID_MAP
+        
+        # Calculate scaling
+        scaled_grid_size = get_scaled_grid_size(screen_w, screen_h)
+        
+        # Create scaled images
+        scaled_imgs = {}
+        for key, img in self.base_imgs.items():
+            scaled_imgs[key] = pygame.transform.scale(img, (scaled_grid_size, scaled_grid_size))
+        
+        # Calculate the position and size of the game area
+        game_area_height = screen_h - UI_HEIGHT
+        scale_x = screen_w / (GRID_W * GRID_SIZE)
+        scale_y = game_area_height / (GRID_H * GRID_SIZE)
+        scale = min(scale_x, scale_y)
+        
+        scaled_width = GRID_W * GRID_SIZE * scale
+        scaled_height = GRID_H * GRID_SIZE * scale
+        offset_x = (screen_w - scaled_width) // 2
+        offset_y = UI_HEIGHT + (game_area_height - scaled_height) // 2
+        
+        # Create game area surface
+        game_surface = pygame.Surface((int(scaled_width), int(scaled_height)))
+        
+        # Draw tiles
+        for y, row in enumerate(self.grid):
+            for x, t in enumerate(row):
+                pos_x = x * scaled_grid_size
+                pos_y = y * scaled_grid_size
+                game_surface.blit(scaled_imgs[t], (pos_x, pos_y))
+        
+        # Draw markers
         sx, sy = self.spawn
         hx, hy = self.home
-        pygame.draw.rect(self.surface, YELLOW,
-                         (sx*GRID_SIZE, sy*GRID_SIZE, GRID_SIZE, GRID_SIZE))
-        pygame.draw.rect(self.surface, PINK,
-                         (hx*GRID_SIZE, hy*GRID_SIZE, GRID_SIZE, GRID_SIZE))
+        
+        # Start marker (green)
+        start_rect = pygame.Rect(sx * scaled_grid_size, sy * scaled_grid_size, scaled_grid_size, scaled_grid_size)
+        pygame.draw.rect(game_surface, GREEN, start_rect)
+        pygame.draw.rect(game_surface, BLACK, start_rect, 2)
+        
+        # End marker (red)
+        end_rect = pygame.Rect(hx * scaled_grid_size, hy * scaled_grid_size, scaled_grid_size, scaled_grid_size)
+        pygame.draw.rect(game_surface, RED, end_rect)
+        pygame.draw.rect(game_surface, BLACK, end_rect, 2)
+        
+        return game_surface, (int(offset_x), int(offset_y))
 
     def set_grid(self, new_grid):
         self.grid = new_grid
-        self.surface.fill((0,0,0))
-        self._draw()
 
     def draw(self, target):
-        target.blit(self.surface, (0, UI_HEIGHT))
+        screen_w, screen_h = target.get_size()
+        game_surface, offset = self._draw(screen_w, screen_h)
+        target.blit(game_surface, offset)
