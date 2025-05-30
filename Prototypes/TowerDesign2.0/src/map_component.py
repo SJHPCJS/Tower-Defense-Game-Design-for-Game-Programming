@@ -23,9 +23,8 @@ class MapComponent:
         self.home = home
 
     def _draw(self, screen_w, screen_h):
-        # Use the latest GRID_MAP data
-        from grid import GRID_MAP
-        self.grid = GRID_MAP
+        # Don't override self.grid - use the one set during initialization
+        # self.grid = GRID_MAP  # Remove this line!
         
         # Calculate scaling
         scaled_grid_size = get_scaled_grid_size(screen_w, screen_h)

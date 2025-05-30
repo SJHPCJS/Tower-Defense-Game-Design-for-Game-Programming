@@ -50,9 +50,9 @@ UI_DANGER = (220, 53, 69)
 # Game settings
 STARTING_MONEY = 100
 TOWER_COSTS = {
-    'Fast': 20,
+    'Fast': 40,
     'Strong': 40,
-    'Balanced': 30
+    'Balanced': 20
 }
 WAVE_REWARD = 50
 KILL_REWARD = 1

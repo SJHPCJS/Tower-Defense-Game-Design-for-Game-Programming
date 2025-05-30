@@ -13,8 +13,8 @@ class Level:
         self.name = "Default Level"
         self.grid = None
         
-        # Initialize path
-        self.recalculate_path()
+        # Remove automatic path initialization - will be called manually after grid is set
+        # self.recalculate_path()  # Commented out
     
     def recalculate_path(self):
         """Recalculate path, called when the level changes"""

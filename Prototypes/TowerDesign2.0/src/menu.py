@@ -114,10 +114,6 @@ class MainMenu:
             subtitle_rect = subtitle.get_rect(center=(screen_w // 2, screen_h // 4 + 80))
             current_screen.blit(subtitle, subtitle_rect)
             
-            # Draw control hints
-            help_text = FONTS['tiny'].render("F11: Toggle Fullscreen", True, (150, 150, 150))
-            current_screen.blit(help_text, (20, screen_h - 30))
-            
             # Draw buttons
             self.start_button.draw(current_screen)
             self.create_button.draw(current_screen)
@@ -245,15 +241,11 @@ class LevelSelector:
                 text_rect = no_levels_text.get_rect(center=(screen_w // 2, screen_h // 2))
                 current_screen.blit(no_levels_text, text_rect)
             
-            # Draw control hints
-            help_text = FONTS['tiny'].render("F11: Toggle Fullscreen | ESC: Back", True, (150, 150, 150))
-            current_screen.blit(help_text, (20, screen_h - 30))
-            
             pygame.display.flip()
             clock.tick(FPS)
 
 def show_level_creator_message():
-    """显示关卡创建器的占位符消息"""
+    """Show level creator placeholder message"""
     font = pygame.font.SysFont('Arial', 48, bold=True)
     message_font = pygame.font.SysFont('Arial', 24)
     
@@ -263,13 +255,13 @@ def show_level_creator_message():
                 pygame.quit()
                 sys.exit()
             elif event.type == pygame.VIDEORESIZE:
-                # 处理窗口大小调整
+                # Handle window resizing
                 new_width = max(event.w, MIN_SCREEN_W)
                 new_height = max(event.h, MIN_SCREEN_H)
                 pygame.display.set_mode((new_width, new_height), pygame.RESIZABLE | pygame.DOUBLEBUF)
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_F11:
-                    # 切换全屏
+                    # Toggle fullscreen
                     pygame.display.toggle_fullscreen()
                 else:
                     return  # Return to main menu
@@ -301,10 +293,6 @@ def show_level_creator_message():
         instruction = message_font.render("Press any key or click to return to main menu", True, BROWN)
         instruction_rect = instruction.get_rect(center=(screen_w // 2, screen_h // 2 + 50))
         current_screen.blit(instruction, instruction_rect)
-        
-        # 绘制控制提示
-        help_text = FONTS['tiny'].render("F11: Toggle Fullscreen", True, (150, 150, 150))
-        current_screen.blit(help_text, (20, screen_h - 30))
         
         pygame.display.flip()
         clock.tick(FPS) 

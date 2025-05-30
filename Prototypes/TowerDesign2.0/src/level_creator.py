@@ -13,10 +13,10 @@ class LevelCreator:
     def __init__(self):
         self.grid = [[1 for _ in range(GRID_W)] for _ in range(GRID_H)]  # 1 = grass, 0 = path
         self.spawn = (0, 0)
-        self.home = (GRID_W - 1, GRID_H - 1)
-        
-        # Set spawn and home as path tiles
+        # Set spawn as path first
         self.grid[self.spawn[1]][self.spawn[0]] = 0
+        # Set a reasonable default home position
+        self.home = (GRID_W - 2, GRID_H - 2)  # A bit inward from corner
         self.grid[self.home[1]][self.home[0]] = 0
         
         self.selected_tool = "place_path"
@@ -358,9 +358,11 @@ class LevelCreator:
             self.level_name_input = ""
     
     def reset_map(self):
-        """Reset the map to all grass except spawn and home"""
+        """Reset the map to all grass except spawn and updated home position"""
         self.grid = [[1 for _ in range(GRID_W)] for _ in range(GRID_H)]
         self.grid[self.spawn[1]][self.spawn[0]] = 0
+        # Update home position to be more reasonable (not bottom-right corner)
+        self.home = (GRID_W - 3, GRID_H - 3)  # A bit inward from corner
         self.grid[self.home[1]][self.home[0]] = 0
         self.show_message("✅ Map reset successfully!", UI_SUCCESS)
     
@@ -369,6 +371,8 @@ class LevelCreator:
         try:
             new_grid = self.algo_tower_path_optimized("optimal")
             self.grid = new_grid
+            # Update home position to be the best end point in the generated grid
+            self.home = self.find_best_end_point()
             path_count = sum(1 for row in self.grid for cell in row if cell == 0)
             self.show_message(f"🧠 AI generated map with {path_count} path tiles!", UI_SUCCESS)
         except Exception as e:
@@ -593,6 +597,21 @@ class LevelCreator:
         instr_text = FONTS['small'].render("Press ENTER to save, ESC to cancel", True, (200, 200, 200))
         instr_x = dialog_x + (dialog_w - instr_text.get_width()) // 2
         screen.blit(instr_text, (instr_x, dialog_y + dialog_h - 20))
+
+    def find_best_end_point(self):
+        """Find the best end point - farthest path tile from spawn"""
+        max_distance = -1
+        best_end = (GRID_W - 1, GRID_H - 1)  # Default fallback
+        
+        for y in range(GRID_H):
+            for x in range(GRID_W):
+                if self.grid[y][x] == 0:  # Is path tile
+                    distance = abs(x - self.spawn[0]) + abs(y - self.spawn[1])
+                    if distance > max_distance:
+                        max_distance = distance
+                        best_end = (x, y)
+        
+        return best_end
 
 def run_level_creator():
     """Main function to run the level creator"""

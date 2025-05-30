@@ -49,15 +49,17 @@ class Game:
         return level_data
     
     def run_game_loop(self, level_data):
-        game_map = MapComponent()
         level = Level()
-        # Initialize Level with loaded level data
+        # Initialize Level with loaded level data BEFORE calling recalculate_path
         if 'name' in level_data:
             level.name = level_data['name']
         if 'grid' in level_data:
             level.grid = level_data['grid']
-        # Ensure Level uses the latest GRID_MAP data
+        # NOW call recalculate_path with the correct grid data
         level.recalculate_path()
+        
+        # Initialize MapComponent with the correct grid data
+        game_map = MapComponent(grid=level.grid)
         
         # Set spawn and home for map component
         game_map.set_spawn_and_home(level.start, level.end)
@@ -110,14 +112,14 @@ class Game:
                             # Get toolbar button info
                             toolbar_info = self.get_toolbar_layout(screen_w, screen_h)
                             
-                            # Check tower build buttons
+                            # Check tower build buttons - FIXED: break is now inside the if condition
                             for button_info in toolbar_info['tower_buttons']:
                                 if button_info['rect'].collidepoint(mx, my):
                                     if money >= TOWER_COSTS[button_info['type']['name']]:
                                         sel = button_info['type']
                                         # Reset demolish mode
                                         selected_tower = None
-                                break
+                                    break  # Only break when a button is actually clicked
                             
                             # Check demolish button
                             if toolbar_info['demolish_button']['rect'].collidepoint(mx, my):
@@ -141,8 +143,8 @@ class Game:
                                             tower.kill()
                                             selected_tower = None
                                             break
-                                # Build mode
-                                elif GRID_MAP[gy][gx] == 1 and sel:
+                                # Build mode - USE LEVEL GRID DATA INSTEAD OF GRID_MAP
+                                elif level.grid and level.grid[gy][gx] == 1 and sel:  # 1 = grass, 0 = path
                                     # Check if there is already a tower at this position
                                     can_build = True
                                     for tower in towers:
@@ -224,13 +226,13 @@ class Game:
         return "menu"
     
     def get_toolbar_layout(self, screen_w, screen_h):
-        """获取当前屏幕尺寸下的工具栏布局信息"""
+        """Get toolbar layout information for current screen size"""
         toolbar_margin = 20
         button_width = 90
         button_height = 70
         button_spacing = 10
         
-        # 创建塔建造按钮
+        # Create tower building buttons
         tower_buttons = []
         for i, tower_type in enumerate(TOWER_TYPES):
             x = toolbar_margin + i * (button_width + button_spacing)
@@ -241,7 +243,7 @@ class Game:
                 'type': tower_type
             })
         
-        # 拆除按钮
+        # Demolish button
         demolish_x = toolbar_margin + len(TOWER_TYPES) * (button_width + button_spacing) + 30
         demolish_button = {
             'rect': pygame.Rect(demolish_x, (UI_HEIGHT - button_height) // 2, button_width, button_height)
@@ -253,31 +255,31 @@ class Game:
         }
 
     def draw_enhanced_toolbar(self, screen, screen_size, selected_type, selected_tower, money, base_hp, level_name):
-        """绘制增强的工具栏"""
+        """Draw enhanced toolbar"""
         screen_w, screen_h = screen_size
         
-        # 工具栏背景
+        # Toolbar background
         toolbar_rect = pygame.Rect(0, 0, screen_w, UI_HEIGHT)
         pygame.draw.rect(screen, UI_DARK_BG, toolbar_rect)
         pygame.draw.rect(screen, UI_LIGHT_BG, toolbar_rect, 3)
         
-        # 获取布局信息
+        # Get layout information
         layout = self.get_toolbar_layout(screen_w, screen_h)
         
-        # 绘制塔建造按钮
+        # Draw tower building buttons
         for button_info in layout['tower_buttons']:
             tower_type = button_info['type']
             rect = button_info['rect']
             
-            # 检查是否选中
+            # Check if selected
             is_selected = selected_type == tower_type
-            # 检查是否有足够金钱
+            # Check if can afford
             can_afford = money >= TOWER_COSTS[tower_type['name']]
-            # 检查悬停
+            # Check hover
             mouse_pos = pygame.mouse.get_pos()
             is_hovered = rect.collidepoint(mouse_pos)
             
-            # 按钮背景色
+            # Button background color
             if is_selected:
                 bg_color = UI_ACCENT
             elif not can_afford:
@@ -287,36 +289,36 @@ class Game:
             else:
                 bg_color = UI_MID_BG
             
-            # 绘制按钮
+            # Draw button
             pygame.draw.rect(screen, bg_color, rect, border_radius=8)
             border_color = tower_type['color'] if can_afford else (100, 100, 100)
             pygame.draw.rect(screen, border_color, rect, 3, border_radius=8)
             
-            # 绘制塔类型图标（使用颜色圆圈）
+            # Draw tower type icon (using colored circle)
             center_x = rect.centerx
             icon_y = rect.y + 20
             pygame.draw.circle(screen, tower_type['color'], (center_x, icon_y), 12)
             pygame.draw.circle(screen, WHITE, (center_x, icon_y), 12, 2)
             
-            # 绘制塔名称
+            # Draw tower name
             name_color = WHITE if can_afford else (120, 120, 120)
             name_text = FONTS['small'].render(tower_type['name'], True, name_color)
             name_rect = name_text.get_rect(center=(center_x, icon_y + 25))
             screen.blit(name_text, name_rect)
             
-            # 绘制价格
+            # Draw price
             cost_color = UI_SUCCESS if can_afford else UI_DANGER
             cost_text = FONTS['tiny'].render(f"${TOWER_COSTS[tower_type['name']]}", True, cost_color)
             cost_rect = cost_text.get_rect(center=(center_x, icon_y + 40))
             screen.blit(cost_text, cost_rect)
             
-            # 绘制描述（悬停时）
+            # Draw description (on hover)
             if is_hovered and 'description' in tower_type:
                 desc_text = FONTS['tiny'].render(tower_type['description'], True, WHITE)
                 desc_y = rect.bottom + 5
                 screen.blit(desc_text, (rect.x, desc_y))
         
-        # 绘制拆除按钮
+        # Draw demolish button
         demolish_rect = layout['demolish_button']['rect']
         is_demolish_active = selected_tower == "demolish_mode"
         mouse_pos = pygame.mouse.get_pos()
@@ -332,11 +334,11 @@ class Game:
         pygame.draw.rect(screen, bg_color, demolish_rect, border_radius=8)
         pygame.draw.rect(screen, UI_DANGER, demolish_rect, 3, border_radius=8)
         
-        # 绘制拆除图标（锤子图标）
+        # Draw demolish icon (hammer icon)
         center_x, center_y = demolish_rect.center
         icon_y = demolish_rect.y + 20
         
-        # 简单的锤子图标
+        # Simple hammer icon
         pygame.draw.circle(screen, UI_DANGER, (center_x, icon_y), 8)
         pygame.draw.rect(screen, UI_DANGER, (center_x - 2, icon_y, 4, 15))
         
@@ -348,44 +350,44 @@ class Game:
         refund_rect = refund_text.get_rect(center=(center_x, icon_y + 40))
         screen.blit(refund_text, refund_rect)
         
-        # 绘制游戏信息面板
+        # Draw game info panel
         info_panel_x = screen_w - 300
         info_panel_w = 280
         info_panel_rect = pygame.Rect(info_panel_x, 10, info_panel_w, UI_HEIGHT - 20)
         pygame.draw.rect(screen, UI_MID_BG, info_panel_rect, border_radius=8)
         pygame.draw.rect(screen, UI_LIGHT_BG, info_panel_rect, 2, border_radius=8)
         
-        # 金钱信息
+        # Money information
         money_text = FONTS['hud'].render(f"Money: ${money}", True, UI_WARNING)
         screen.blit(money_text, (info_panel_x + 15, 25))
         
-        # 基地血量
+        # Base health
         hp_color = UI_SUCCESS if base_hp > 5 else UI_DANGER
         hp_text = FONTS['hud'].render(f"Base HP: {base_hp}", True, hp_color)
         screen.blit(hp_text, (info_panel_x + 15, 50))
         
-        # 关卡名称
+        # Level name
         level_text = FONTS['hud'].render(f"Level: {level_name}", True, UI_ACCENT)
         screen.blit(level_text, (info_panel_x + 15, 75))
         
-        # 绘制游戏标题
+        # Draw game title
         title_text = FONTS['hud'].render("Forest Guard", True, FOREST_GREEN)
         screen.blit(title_text, (20, 15))
         
-        # 绘制控制提示
-        help_text = FONTS['tiny'].render("F11: Fullscreen | ESC: Menu", True, (150, 150, 150))
+        # Draw control hints (removed fullscreen hint)
+        help_text = FONTS['tiny'].render("ESC: Menu", True, (150, 150, 150))
         screen.blit(help_text, (20, UI_HEIGHT - 25))
 
     def draw_game_over_screen(self, screen, screen_size, victory=False):
-        """绘制游戏结束界面"""
+        """Draw game over screen"""
         screen_w, screen_h = screen_size
         
-        # 半透明背景
+        # Semi-transparent background
         overlay = pygame.Surface((screen_w, screen_h), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 150))
         screen.blit(overlay, (0, 0))
         
-        # 结果面板
+        # Result panel
         panel_w, panel_h = 400, 200
         panel_x = (screen_w - panel_w) // 2
         panel_y = (screen_h - panel_h) // 2
@@ -394,7 +396,7 @@ class Game:
         pygame.draw.rect(screen, UI_DARK_BG, panel_rect, border_radius=15)
         pygame.draw.rect(screen, UI_LIGHT_BG, panel_rect, 3, border_radius=15)
         
-        # 标题
+        # Title
         if victory:
             title_text = "Victory!"
             title_color = UI_SUCCESS
@@ -406,7 +408,7 @@ class Game:
         title_rect = title.get_rect(center=(screen_w // 2, panel_y + 60))
         screen.blit(title, title_rect)
         
-        # 提示文字
+        # Instruction text
         instruction = FONTS['button'].render("Press ESC to return to menu", True, WHITE)
         instruction_rect = instruction.get_rect(center=(screen_w // 2, panel_y + 130))
         screen.blit(instruction, instruction_rect)
