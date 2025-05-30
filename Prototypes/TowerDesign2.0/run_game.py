@@ -10,7 +10,7 @@ import os
 src_path = os.path.join(os.path.dirname(__file__), 'src')
 sys.path.insert(0, src_path)
 
-from src.game import main
+from game import main
 
 if __name__ == "__main__":
     print("Starting Forest Guard...")

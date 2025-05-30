@@ -3,6 +3,7 @@ import pygame
 import json
 from settings import *
 from menu import MainMenu, LevelSelector, show_level_creator_message
+from level_creator import run_level_creator
 from grid import GRID_MAP, update_grid_map
 from map_component import MapComponent
 from level import Level
@@ -116,7 +117,7 @@ class Game:
                                         sel = button_info['type']
                                         # Reset demolish mode
                                         selected_tower = None
-                                    break
+                                break
                             
                             # Check demolish button
                             if toolbar_info['demolish_button']['rect'].collidepoint(mx, my):
@@ -221,7 +222,7 @@ class Game:
             pygame.display.flip()
         
         return "menu"
-
+    
     def get_toolbar_layout(self, screen_w, screen_h):
         """获取当前屏幕尺寸下的工具栏布局信息"""
         toolbar_margin = 20
@@ -419,7 +420,10 @@ class Game:
                 if result == "start":
                     self.state = "level_select"
                 elif result == "creator":
-                    show_level_creator_message()
+                    creator_result = run_level_creator()
+                    if creator_result == "quit":
+                        pygame.quit()
+                        sys.exit()
                     self.state = "menu"
                     
             elif self.state == "level_select":

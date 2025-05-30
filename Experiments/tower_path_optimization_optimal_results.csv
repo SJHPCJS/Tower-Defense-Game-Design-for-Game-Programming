@@ -1,0 +1,3 @@
+Strategy,Algorithm,Avg Time (ms),Avg Path Tiles,Avg Branch Points,Avg Cleaned Tiles
+Optimal,Original,0.402,49.3,16.2,0.0
+Optimal,Optimized,0.804,38.2,8.0,11.1
