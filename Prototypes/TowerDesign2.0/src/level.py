@@ -1,6 +1,6 @@
 import pygame
 from settings import *
-from enemy import Enemy
+from enemy import Enemy, EnemyWithGrid
 from pathfinding import a_star
 from grid import GRID_MAP
 
@@ -76,9 +76,11 @@ class Level:
         self.timer += dt
         if self.timer >= self.delay:
             self.timer -= self.delay
-            # Create enemy with path
-            if self.path:
-                enemy = Enemy(self.path)  # Only pass path
+            # Create enemy with start and end points so each enemy calculates its own path
+            # This restores random path selection for enemies
+            if self.start and self.end:
+                # Create enemy with grid context
+                enemy = EnemyWithGrid(self.start, self.end, self.grid if self.grid is not None else GRID_MAP)
                 self.enemies.add(enemy)
 
         self.enemies.update(dt)
@@ -86,7 +88,7 @@ class Level:
         # Check if enemies have reached the end
         for e in list(self.enemies):
             # Check new version enemy's end reached logic
-            if hasattr(e, 'path_index') and e.path_index >= len(self.path) - 1:
+            if hasattr(e, 'path_index') and e.path_index >= len(e.path) - 1:
                 self.base_hp -= 1
                 e.kill()
             # Compatibility with old version enemy
