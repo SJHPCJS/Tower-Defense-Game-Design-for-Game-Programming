@@ -35,6 +35,7 @@ class Enemy(pygame.sprite.Sprite):
         self.reached_end = False
         self.damage_to_base = 1
         self.is_dead = False  # Used for kill reward determination
+        self.reward_given = False  # Ensure kill reward is only given once
         
         # Enemy size (base size, will be scaled)
         self.base_size = 32
@@ -111,8 +112,12 @@ class Enemy(pygame.sprite.Sprite):
         self.hp = self.health  # Sync with new version attribute
         self.flash_time = 0.1
         self.hit_flash = 0.1  # Sync with new version attribute
-        if self.health <= 0:
+        if self.health <= 0 and not self.reward_given:
             self.is_dead = True
+            self.reward_given = True  # Mark reward as given
+            # Trigger kill reward callback if set
+            if hasattr(self, 'kill_callback') and self.kill_callback:
+                self.kill_callback(self)
             self.kill()
 
     def update(self, dt):
@@ -190,46 +195,14 @@ class EnemyWithGrid(Enemy):
         # Store grid for pathfinding
         self.grid = grid
         
-        # Call pygame.sprite.Sprite.__init__ directly to avoid Enemy's __init__
-        pygame.sprite.Sprite.__init__(self)
-        
         # Calculate path using the provided grid
-        self.path = a_star(start, end, grid)
-        if not self.path:
+        path = a_star(start, end, grid)
+        if not path:
             raise ValueError("No path found!")
         
-        # Initialize all the same attributes as Enemy
-        self.step = 0
-        self.path_index = 0  # Compatibility with new version
-        self.progress = 0.0  # Progress between current and next waypoint (0.0 to 1.0)
-        self.speed = 50
-        self.max_health = 100
-        self.health = self.max_health
-        self.hp = self.max_health  # Compatibility with new version
-        self.max_hp = self.max_health  # Compatibility with new version
-        self.flash_time = 0.0
-        self.hit_flash = 0.0  # Compatibility with new version
-        self.reached_end = False
-        self.damage_to_base = 1
-        self.is_dead = False  # Used for kill reward determination
-        
-        # Enemy size (base size, will be scaled)
-        self.base_size = 32
-        self.size = self.base_size
-        
-        self.image = pygame.Surface((self.size, self.size))
-        self.image.fill(BLUE)
-        self.rect = self.image.get_rect()
+        # Initialize using the base Enemy class with the calculated path
+        super().__init__(path, None, enemy_type)
 
-        # Set initial position (will be updated properly in update method)
-        self._update_position_and_size()
-        
-        # Set initial position at the first path point
-        if self.path:
-            gx, gy = self.path[0]
-            initial_pos = self._tile_center(gx, gy)
-            self.rect.center = (initial_pos.x, initial_pos.y)
-    
     def calculate_path(self, start, end):
         """Calculate path using the provided grid"""
         return a_star(start, end, self.grid)

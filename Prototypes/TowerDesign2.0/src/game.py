@@ -72,7 +72,21 @@ class Game:
         money = STARTING_MONEY
         selected_tower = None
         current_screen_size = screen.get_size()
-
+        
+        # Wave completion message display
+        wave_message = ""
+        wave_message_timer = 0.0
+        wave_message_duration = 3.0  # Show for 3 seconds
+        
+        # Kill reward callback function
+        def on_enemy_killed(enemy):
+            nonlocal money
+            money += KILL_REWARD
+            print(f"Enemy killed! Reward: +${KILL_REWARD}")
+        
+        # Set kill callback for level
+        level.set_kill_callback(on_enemy_killed)
+        
         # Toolbar settings will be dynamically calculated in draw_enhanced_toolbar
         
         running = True
@@ -159,26 +173,37 @@ class Game:
 
             # Update game logic only if the game is not over
             if not game_over and not game_won:
+                # Store previous wave number to detect wave completion
+                prev_wave = level.current_wave
+                
                 level.update(dt)
                 bullets.update(dt)
                 towers.update(dt, level.enemies, bullets)
                 
-                # Gain money reward
-                for enemy in level.enemies:
-                    if hasattr(enemy, 'is_dead') and enemy.is_dead and not hasattr(enemy, 'rewarded'):
-                        money += KILL_REWARD
-                        enemy.rewarded = True
+                # Check for wave completion reward
+                if level.current_wave > prev_wave:
+                    # Wave completed, give reward
+                    money += WAVE_REWARD
+                    wave_message = f"Wave {prev_wave} Complete! Bonus: +${WAVE_REWARD}"
+                    wave_message_timer = 0.0
+                    print(f"Wave {prev_wave} completed! Bonus: +${WAVE_REWARD}")
                 
                 # Check game over condition
                 if level.base_hp <= 0:
                     game_over = True
+            
+            # Update wave message timer
+            if wave_message:
+                wave_message_timer += dt
+                if wave_message_timer >= wave_message_duration:
+                    wave_message = ""
 
             # Draw background
             current_screen = pygame.display.get_surface()
             current_screen.fill(BG_COLOUR)
 
-            # Draw enhanced toolbar
-            self.draw_enhanced_toolbar(current_screen, current_screen_size, sel, selected_tower, money, level.base_hp, level.name)
+            # Draw enhanced toolbar (without wave panel)
+            self.draw_enhanced_toolbar(current_screen, current_screen_size, sel, selected_tower, money, level.base_hp, level.name, level)
 
             # Draw back button
             screen_w, screen_h = current_screen_size
@@ -214,6 +239,13 @@ class Game:
                                 overlay.fill((255, 0, 0, 80))
                                 current_screen.blit(overlay, (px, py))
                                 break
+            
+            # Draw wave information panel on top of everything
+            self.draw_wave_panel(current_screen, current_screen_size, level)
+            
+            # Draw wave completion message in center
+            if wave_message:
+                self.draw_wave_message(current_screen, current_screen_size, wave_message)
 
             # Draw game over screen
             if game_over:
@@ -254,7 +286,7 @@ class Game:
             'demolish_button': demolish_button
         }
 
-    def draw_enhanced_toolbar(self, screen, screen_size, selected_type, selected_tower, money, base_hp, level_name):
+    def draw_enhanced_toolbar(self, screen, screen_size, selected_type, selected_tower, money, base_hp, level_name, level):
         """Draw enhanced toolbar"""
         screen_w, screen_h = screen_size
         
@@ -377,6 +409,58 @@ class Game:
         # Draw control hints (removed fullscreen hint)
         help_text = FONTS['tiny'].render("ESC: Menu", True, (150, 150, 150))
         screen.blit(help_text, (20, UI_HEIGHT - 25))
+
+    def draw_wave_panel(self, screen, screen_size, level):
+        """Draw wave information panel on top of everything"""
+        screen_w, screen_h = screen_size
+        
+        # Wave information panel (bottom-left area)
+        wave_panel_x = 20
+        wave_panel_y = screen_h - 80  # Position near bottom of screen
+        wave_panel_w = 300
+        wave_panel_h = 60
+        wave_panel_rect = pygame.Rect(wave_panel_x, wave_panel_y, wave_panel_w, wave_panel_h)
+        pygame.draw.rect(screen, UI_MID_BG, wave_panel_rect, border_radius=8)
+        pygame.draw.rect(screen, UI_ACCENT, wave_panel_rect, 2, border_radius=8)
+        
+        # Wave title
+        wave_title = FONTS['button'].render(f"Wave {level.current_wave}", True, UI_ACCENT)
+        screen.blit(wave_title, (wave_panel_x + 10, wave_panel_y + 5))
+        
+        # Wave progress
+        if level.in_wave_break:
+            # Show countdown during wave break
+            time_left = level.wave_break_duration - level.wave_break_timer
+            countdown_text = FONTS['small'].render(f"Next wave in: {time_left:.1f}s", True, UI_WARNING)
+            screen.blit(countdown_text, (wave_panel_x + 10, wave_panel_y + 30))
+        else:
+            # Show enemy progress during wave
+            living_enemies = len([e for e in level.enemies if hasattr(e, 'health') and e.health > 0])
+            progress_text = FONTS['small'].render(f"Enemies: {level.enemies_spawned_this_wave}/{level.enemies_in_wave} (Alive: {living_enemies})", True, WHITE)
+            screen.blit(progress_text, (wave_panel_x + 10, wave_panel_y + 30))
+
+    def draw_wave_message(self, screen, screen_size, message):
+        """Draw wave completion message in center of screen"""
+        screen_w, screen_h = screen_size
+        
+        # Semi-transparent background
+        overlay = pygame.Surface((screen_w, screen_h), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 100))
+        screen.blit(overlay, (0, 0))
+        
+        # Message panel
+        panel_w, panel_h = 400, 120
+        panel_x = (screen_w - panel_w) // 2
+        panel_y = (screen_h - panel_h) // 2
+        panel_rect = pygame.Rect(panel_x, panel_y, panel_w, panel_h)
+        
+        pygame.draw.rect(screen, UI_DARK_BG, panel_rect, border_radius=15)
+        pygame.draw.rect(screen, UI_SUCCESS, panel_rect, 3, border_radius=15)
+        
+        # Message text
+        text = FONTS['title'].render(message, True, UI_SUCCESS)
+        text_rect = text.get_rect(center=(screen_w // 2, screen_h // 2))
+        screen.blit(text, text_rect)
 
     def draw_game_over_screen(self, screen, screen_size, victory=False):
         """Draw game over screen"""

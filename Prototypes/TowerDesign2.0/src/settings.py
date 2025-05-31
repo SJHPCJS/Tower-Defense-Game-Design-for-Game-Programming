@@ -14,9 +14,15 @@ FPS         = 60
 MIN_SCREEN_W = 800
 MIN_SCREEN_H = 600
 
-# Default window size (adjustable)
-DEFAULT_SCREEN_W = max(SCREEN_W, MIN_SCREEN_W)
-DEFAULT_SCREEN_H = max(SCREEN_H, MIN_SCREEN_H)
+# Get the maximum screen size for default
+pygame.init()
+info = pygame.display.Info()
+MAX_SCREEN_W = info.current_w
+MAX_SCREEN_H = info.current_h
+
+# Default window size - use maximized screen size
+DEFAULT_SCREEN_W = MAX_SCREEN_W
+DEFAULT_SCREEN_H = MAX_SCREEN_H
 
 # colours
 WHITE     = (255, 255, 255)
@@ -144,9 +150,12 @@ def get_scaled_grid_size(screen_width=None, screen_height=None) -> int:
 
 
 pygame.init()
-# Create a resizable window
+# Create a maximized resizable window
 screen = pygame.display.set_mode((DEFAULT_SCREEN_W, DEFAULT_SCREEN_H), 
                                 pygame.RESIZABLE | pygame.DOUBLEBUF)
+# Maximize the window on startup (optional fallback)
+pygame.display.set_mode((DEFAULT_SCREEN_W, DEFAULT_SCREEN_H), 
+                        pygame.RESIZABLE | pygame.DOUBLEBUF)
 clock  = pygame.time.Clock()
 pygame.display.set_caption("Forest Guard - Tower Defense")
 FONT = pygame.font.SysFont(None, 24)
