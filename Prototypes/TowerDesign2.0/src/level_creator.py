@@ -8,6 +8,7 @@ from collections import deque
 from typing import List, Tuple, Set
 from pathlib import Path
 from settings import *
+from pathfinding import a_star
 
 class LevelCreator:
     def __init__(self):
@@ -32,13 +33,31 @@ class LevelCreator:
         self.level_name_input = ""
         self.input_active = False
         
+        # Level settings for the new save dialog
+        self.level_settings = {
+            'name': '',
+            'initial_money': 100,
+            'wave_count': 5,
+            'enemy_speed': 50,
+            'best_time': None
+        }
+        
+        # Settings dialog input fields
+        self.settings_inputs = {
+            'name': '',
+            'initial_money': str(self.level_settings['initial_money']),
+            'wave_count': str(self.level_settings['wave_count']),
+            'enemy_speed': str(self.level_settings['enemy_speed'])
+        }
+        self.active_input_field = None
+        
         # Tools definition with modern UI colors
         self.tools = [
-            {'id': 'place_path', 'name': 'Place Path', 'icon': '🛤️', 'color': UI_SUCCESS, 'hover': (60, 200, 120)},
-            {'id': 'delete_path', 'name': 'Delete Path', 'icon': '🗑️', 'color': UI_DANGER, 'hover': (240, 80, 90)},
-            {'id': 'reset_map', 'name': 'Reset Map', 'icon': '🔄', 'color': UI_WARNING, 'hover': (255, 210, 30)},
-            {'id': 'ai_generate', 'name': 'AI Generate', 'icon': '🧠', 'color': UI_ACCENT, 'hover': (90, 150, 200)},
-            {'id': 'save_level', 'name': 'Save Level', 'icon': '💾', 'color': (100, 100, 255), 'hover': (130, 130, 255)}
+            {'id': 'place_path', 'name': 'Place Path', 'icon': 'PATH', 'color': UI_SUCCESS, 'hover': (60, 200, 120)},
+            {'id': 'delete_path', 'name': 'Delete Path', 'icon': 'DEL', 'color': UI_DANGER, 'hover': (240, 80, 90)},
+            {'id': 'reset_map', 'name': 'Reset Map', 'icon': 'RESET', 'color': UI_WARNING, 'hover': (255, 210, 30)},
+            {'id': 'ai_generate', 'name': 'AI Generate', 'icon': 'AI', 'color': UI_ACCENT, 'hover': (90, 150, 200)},
+            {'id': 'save_level', 'name': 'Save Level', 'icon': 'SAVE', 'color': (100, 100, 255), 'hover': (130, 130, 255)}
         ]
         
     def _load_tile_images(self):
@@ -259,47 +278,57 @@ class LevelCreator:
         self.message_timer = pygame.time.get_ticks() + duration
     
     def handle_events(self, event):
-        if event.type == pygame.KEYDOWN:
+        if event.type == pygame.QUIT:
+            return "quit"
+        elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 if self.save_dialog_active:
                     self.save_dialog_active = False
                     self.input_active = False
-                    self.level_name_input = ""
+                    self.active_input_field = None
                 else:
-                    return "main_menu"
-            
-            if self.input_active:
-                if event.key == pygame.K_RETURN:
-                    if self.level_name_input.strip():
-                        self.save_level()
-                    self.save_dialog_active = False
-                    self.input_active = False
+                    return "menu"
+            elif self.save_dialog_active and self.active_input_field:
+                # Handle input for any active field
+                current_text = self.settings_inputs[self.active_input_field]
+                if event.key == pygame.K_RETURN or event.key == pygame.K_TAB:
+                    self.active_input_field = None
                 elif event.key == pygame.K_BACKSPACE:
-                    self.level_name_input = self.level_name_input[:-1]
+                    self.settings_inputs[self.active_input_field] = current_text[:-1]
                 else:
-                    if len(self.level_name_input) < 30:
-                        self.level_name_input += event.unicode
-        
-        elif event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 1:  # Left click
-                mx, my = event.pos
-                current_screen = pygame.display.get_surface()
-                screen_w, screen_h = current_screen.get_size()
-                
-                if my < UI_HEIGHT:
-                    # Toolbar interaction
-                    self.handle_toolbar_click(mx, my, screen_w)
-                else:
-                    # Grid interaction
-                    if not self.save_dialog_active:
-                        self.handle_grid_click(mx, my, screen_w, screen_h)
-                
-                # Save dialog interaction
-                if self.save_dialog_active:
-                    self.handle_save_dialog_click(mx, my, screen_w, screen_h)
+                    if self.active_input_field == 'name':
+                        # Allow text input for name
+                        if len(current_text) < 30 and event.unicode.isprintable():
+                            self.settings_inputs[self.active_input_field] = current_text + event.unicode
+                    else:
+                        # Only digits for numeric fields
+                        if event.unicode.isdigit() and len(current_text) < 10:
+                            self.settings_inputs[self.active_input_field] = current_text + event.unicode
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            mx, my = event.pos
+            screen = pygame.display.get_surface()
+            screen_w, screen_h = screen.get_size()
+            
+            if self.save_dialog_active:
+                result = self.handle_save_dialog_click(mx, my, screen_w, screen_h)
+                if result == "menu":
+                    return "menu"
+            elif my < UI_HEIGHT:
+                result = self.handle_toolbar_click(mx, my, screen_w)
+                if result:
+                    return result
+            else:
+                self.handle_grid_click(mx, my, screen_w, screen_h)
+        elif event.type == pygame.VIDEORESIZE:
+            new_width = max(event.w, MIN_SCREEN_W)
+            new_height = max(event.h, MIN_SCREEN_H)
+            pygame.display.set_mode((new_width, new_height), pygame.RESIZABLE | pygame.DOUBLEBUF)
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_F11:
+                pygame.display.toggle_fullscreen()
         
         return None
-    
+
     def handle_toolbar_click(self, mx, my, screen_w):
         """Handle toolbar button clicks"""
         button_width = 150
@@ -315,10 +344,16 @@ class LevelCreator:
                 if tool['id'] == 'save_level':
                     if self.has_valid_path():
                         self.save_dialog_active = True
-                        self.input_active = True
-                        self.level_name_input = ""
+                        # Reset all input fields
+                        self.settings_inputs = {
+                            'name': '',
+                            'initial_money': str(self.level_settings['initial_money']),
+                            'wave_count': str(self.level_settings['wave_count']),
+                            'enemy_speed': str(self.level_settings['enemy_speed'])
+                        }
+                        self.active_input_field = 'name'  # Start with name field active
                     else:
-                        self.show_message("⚠️ No valid path found! Please create a path from spawn to home.", UI_DANGER)
+                        self.show_message("No valid path found!", UI_DANGER)
                 elif tool['id'] == 'reset_map':
                     self.reset_map()
                 elif tool['id'] == 'ai_generate':
@@ -326,114 +361,289 @@ class LevelCreator:
                 else:
                     self.selected_tool = tool['id']
                 break
-    
-    def handle_grid_click(self, mx, my, screen_w, screen_h):
-        """Handle grid tile clicks"""
-        gx, gy = px_to_grid(mx, my, screen_w, screen_h)
         
+        return None
+
+    def handle_grid_click(self, mx, my, screen_w, screen_h):
+        """Handle grid area clicks"""
+        gx, gy = px_to_grid(mx, my, screen_w, screen_h)
         if 0 <= gx < GRID_W and 0 <= gy < GRID_H:
-            # Don't allow modifying spawn and home
-            if (gx, gy) == self.spawn or (gx, gy) == self.home:
-                self.show_message("⚠️ Cannot modify spawn or home positions!", UI_WARNING)
-                return
-            
-            if self.selected_tool == 'place_path':
+            if self.selected_tool == "place_path":
                 self.grid[gy][gx] = 0
-            elif self.selected_tool == 'delete_path':
+            elif self.selected_tool == "delete_path":
                 self.grid[gy][gx] = 1
-    
+
     def handle_save_dialog_click(self, mx, my, screen_w, screen_h):
         """Handle save dialog clicks"""
-        dialog_w, dialog_h = 400, 200
+        dialog_w, dialog_h = 600, 500
         dialog_x = (screen_w - dialog_w) // 2
         dialog_y = (screen_h - dialog_h) // 2
         
-        # Cancel button
-        cancel_x = dialog_x + dialog_w - 90
-        cancel_y = dialog_y + dialog_h - 50
+        # Input fields
+        field_configs = [
+            ('name', dialog_y + 100),
+            ('initial_money', dialog_y + 150),
+            ('wave_count', dialog_y + 200),
+            ('enemy_speed', dialog_y + 250)
+        ]
         
-        if cancel_x <= mx <= cancel_x + 80 and cancel_y <= my <= cancel_y + 40:
+        self.active_input_field = None
+        for field_name, y_pos in field_configs:
+            field_rect = pygame.Rect(dialog_x + 250, y_pos, 200, 30)
+            if field_rect.collidepoint(mx, my):
+                self.active_input_field = field_name
+                break
+        
+        # Save button
+        save_rect = pygame.Rect(dialog_x + dialog_w - 180, dialog_y + dialog_h - 70, 80, 40)
+        if save_rect.collidepoint(mx, my):
+            result = self.save_level_with_settings()
+            if result:  # If save was successful, return to menu
+                return "menu"
+        
+        # Cancel button
+        cancel_rect = pygame.Rect(dialog_x + dialog_w - 90, dialog_y + dialog_h - 70, 80, 40)
+        if cancel_rect.collidepoint(mx, my):
             self.save_dialog_active = False
-            self.input_active = False
-            self.level_name_input = ""
-    
+            self.active_input_field = None
+
     def reset_map(self):
-        """Reset the map to all grass except spawn and updated home position"""
+        """Reset the map to all grass"""
         self.grid = [[1 for _ in range(GRID_W)] for _ in range(GRID_H)]
+        self.spawn = (0, 0)
+        self.home = (GRID_W-1, GRID_H-1)
         self.grid[self.spawn[1]][self.spawn[0]] = 0
-        # Update home position to be more reasonable (not bottom-right corner)
-        self.home = (GRID_W - 3, GRID_H - 3)  # A bit inward from corner
         self.grid[self.home[1]][self.home[0]] = 0
-        self.show_message("✅ Map reset successfully!", UI_SUCCESS)
-    
+        self.show_message("Map reset to grass!", UI_SUCCESS)
+
     def ai_generate_map(self):
-        """Generate map using AI algorithm"""
+        """Generate a map using AI pathfinding"""
         try:
+            # Use the optimized algorithm to generate path
             new_grid = self.algo_tower_path_optimized("optimal")
             self.grid = new_grid
-            # Update home position to be the best end point in the generated grid
+            
+            # Update spawn and home
+            self.spawn = self.find_best_start_point()
             self.home = self.find_best_end_point()
-            path_count = sum(1 for row in self.grid for cell in row if cell == 0)
-            self.show_message(f"🧠 AI generated map with {path_count} path tiles!", UI_SUCCESS)
+            
+            self.show_message("AI generated path successfully!", UI_SUCCESS)
         except Exception as e:
-            self.show_message(f"❌ AI generation failed: {str(e)}", UI_DANGER)
+            self.show_message(f"AI generation failed: {str(e)}", UI_DANGER)
     
-    def save_level(self):
-        """Save the current level"""
-        if not self.level_name_input.strip():
-            self.show_message("⚠️ Please enter a level name!", UI_WARNING)
-            return
+    def find_best_start_point(self):
+        """Find the best start point in the current grid"""
+        # Look for path tiles in the first row or first column
+        for x in range(GRID_W):
+            if self.grid[0][x] == 0:
+                return (x, 0)
+        for y in range(GRID_H):
+            if self.grid[y][0] == 0:
+                return (0, y)
+        # Default fallback
+        return (0, 0)
+    
+    def find_best_end_point(self):
+        """Find the best end point in the current grid"""
+        start = self.find_best_start_point()
+        max_distance = -1
+        best_end = (GRID_W-1, GRID_H-1)
         
-        # Check for existing files
-        levels_dir = Path(__file__).parent.parent / 'levels'
-        level_filename = f"{self.level_name_input.strip()}.json"
-        level_path = levels_dir / level_filename
+        for y in range(GRID_H):
+            for x in range(GRID_W):
+                if self.grid[y][x] == 0:  # Is path
+                    distance = abs(x - start[0]) + abs(y - start[1])
+                    if distance > max_distance:
+                        max_distance = distance
+                        best_end = (x, y)
         
-        if level_path.exists():
-            self.show_message(f"⚠️ Level '{self.level_name_input}' already exists!", UI_WARNING)
-            return
+        return best_end
+
+    def save_level_with_settings(self):
+        """Save the level with all settings"""
+        try:
+            # Validate name
+            if not self.settings_inputs['name'].strip():
+                self.show_message("Please enter a level name!", UI_DANGER)
+                return False
+            
+            # Parse settings from input fields
+            initial_money = int(self.settings_inputs['initial_money'] or 100)
+            wave_count = int(self.settings_inputs['wave_count'] or 5)
+            enemy_speed = int(self.settings_inputs['enemy_speed'] or 50)
+            
+            # Validate settings
+            if initial_money < 0:
+                initial_money = 100
+            if wave_count < 1:
+                wave_count = 5
+            if enemy_speed < 10:
+                enemy_speed = 50
+                
+        except ValueError:
+            self.show_message("Invalid numeric values!", UI_DANGER)
+            return False
+        
+        # Update spawn and home
+        self.spawn = self.find_best_start_point()
+        self.home = self.find_best_end_point()
         
         # Create level data
         level_data = {
-            'name': self.level_name_input.strip(),
-            'grid': self.grid
+            "name": self.settings_inputs['name'].strip(),
+            "settings": {
+                "initial_money": initial_money,
+                "wave_count": wave_count,
+                "enemy_speed": enemy_speed,
+                "best_time": None
+            },
+            "grid": self.grid
         }
         
+        # Save to file
+        levels_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "levels")
+        os.makedirs(levels_dir, exist_ok=True)
+        
+        filename = f"{self.settings_inputs['name'].strip()}.json"
+        filepath = os.path.join(levels_dir, filename)
+        
         try:
-            # Ensure levels directory exists
-            levels_dir.mkdir(exist_ok=True)
-            
-            # Save the level
-            with open(level_path, 'w', encoding='utf-8') as f:
-                json.dump(level_data, f, indent=2)
-            
-            self.show_message(f"✅ Level '{self.level_name_input}' saved successfully! Press ESC to return to main menu.", UI_SUCCESS, 5000)
-            self.level_name_input = ""
-            
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(level_data, f, indent=2, ensure_ascii=False)
+            self.show_message(f"Level saved as {filename}!", UI_SUCCESS)
+            self.save_dialog_active = False
+            return True
         except Exception as e:
-            self.show_message(f"❌ Failed to save level: {str(e)}", UI_DANGER)
-    
+            self.show_message(f"Failed to save: {str(e)}", UI_DANGER)
+            return False
+
     def draw(self, screen):
-        """Draw the level creator interface"""
-        screen_w, screen_h = screen.get_size()
+        """Main drawing method"""
+        current_screen = pygame.display.get_surface()
+        screen_w, screen_h = current_screen.get_size()
         
         # Clear screen
-        screen.fill(BG_COLOR)
+        screen.fill(BG_COLOUR)
         
-        # Draw toolbar
+        # Draw main UI
         self.draw_toolbar(screen, screen_w)
-        
-        # Draw grid
         self.draw_grid(screen, screen_w, screen_h)
         
-        # Draw message
-        if pygame.time.get_ticks() < self.message_timer:
+        # Handle message timer
+        if self.message and pygame.time.get_ticks() > self.message_timer:
+            self.message = ""
+        
+        # Draw temporary message
+        if self.message:
             self.draw_message(screen, screen_w, screen_h)
         
-        # Draw save dialog
+        # Draw dialogs on top
         if self.save_dialog_active:
-            self.draw_save_dialog(screen, screen_w, screen_h)
-    
+            self.draw_complete_save_dialog(screen, screen_w, screen_h)
+
+    def draw_complete_save_dialog(self, screen, screen_w, screen_h):
+        """Draw the complete save dialog with all settings"""
+        dialog_w, dialog_h = 600, 500
+        dialog_x = (screen_w - dialog_w) // 2
+        dialog_y = (screen_h - dialog_h) // 2
+        
+        # Semi-transparent overlay
+        overlay = pygame.Surface((screen_w, screen_h), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 150))
+        screen.blit(overlay, (0, 0))
+        
+        # Dialog box
+        dialog_rect = pygame.Rect(dialog_x, dialog_y, dialog_w, dialog_h)
+        pygame.draw.rect(screen, UI_DARK_BG, dialog_rect, border_radius=15)
+        pygame.draw.rect(screen, UI_ACCENT, dialog_rect, 3, border_radius=15)
+        
+        # Title
+        title_text = FONTS['title'].render("Save Level", True, WHITE)
+        title_x = dialog_x + (dialog_w - title_text.get_width()) // 2
+        screen.blit(title_text, (title_x, dialog_y + 20))
+        
+        # Input fields
+        field_configs = [
+            ('Level Name:', 'name', dialog_y + 100),
+            ('Initial Money:', 'initial_money', dialog_y + 150),
+            ('Wave Count:', 'wave_count', dialog_y + 200),
+            ('Enemy Speed:', 'enemy_speed', dialog_y + 250)
+        ]
+        
+        for label_text, field_name, y_pos in field_configs:
+            # Label
+            label = FONTS['hud'].render(label_text, True, WHITE)
+            screen.blit(label, (dialog_x + 30, y_pos))
+            
+            # Input field
+            field_rect = pygame.Rect(dialog_x + 250, y_pos, 200, 30)
+            is_active = self.active_input_field == field_name
+            field_color = UI_ACCENT if is_active else UI_MID_BG
+            
+            pygame.draw.rect(screen, field_color, field_rect, border_radius=5)
+            pygame.draw.rect(screen, WHITE, field_rect, 2, border_radius=5)
+            
+            # Input text
+            display_text = self.settings_inputs[field_name]
+            input_text = FONTS['hud'].render(display_text, True, WHITE)
+            screen.blit(input_text, (field_rect.x + 10, field_rect.y + 5))
+            
+            # Cursor for active field
+            if is_active and pygame.time.get_ticks() % 1000 < 500:
+                cursor_x = field_rect.x + 10 + input_text.get_width()
+                pygame.draw.line(screen, WHITE, (cursor_x, field_rect.y + 5), (cursor_x, field_rect.y + 25), 2)
+        
+        # Help text
+        help_texts = [
+            "Configure your level:",
+            "• Level Name: Display name for the level",
+            "• Initial Money: Starting money for players",
+            "• Wave Count: Total number of enemy waves",
+            "• Enemy Speed: Base movement speed of enemies"
+        ]
+        
+        for i, help_text in enumerate(help_texts):
+            color = UI_ACCENT if i == 0 else (200, 200, 200)
+            text = FONTS['small'].render(help_text, True, color)
+            screen.blit(text, (dialog_x + 30, dialog_y + 310 + i * 20))
+        
+        # Buttons
+        # Save button
+        save_x = dialog_x + dialog_w - 180
+        save_y = dialog_y + dialog_h - 70
+        save_rect = pygame.Rect(save_x, save_y, 80, 40)
+        
+        mx, my = pygame.mouse.get_pos()
+        save_hover = save_rect.collidepoint(mx, my)
+        save_color = UI_SUCCESS if save_hover else UI_MID_BG
+        
+        pygame.draw.rect(screen, save_color, save_rect, border_radius=5)
+        pygame.draw.rect(screen, UI_SUCCESS, save_rect, 2, border_radius=5)
+        save_text = FONTS['button'].render("Save", True, WHITE)
+        save_text_x = save_x + (80 - save_text.get_width()) // 2
+        save_text_y = save_y + (40 - save_text.get_height()) // 2
+        screen.blit(save_text, (save_text_x, save_text_y))
+        
+        # Cancel button
+        cancel_x = dialog_x + dialog_w - 90
+        cancel_y = dialog_y + dialog_h - 70
+        cancel_rect = pygame.Rect(cancel_x, cancel_y, 80, 40)
+        
+        cancel_hover = cancel_rect.collidepoint(mx, my)
+        cancel_color = UI_DANGER if cancel_hover else UI_MID_BG
+        
+        pygame.draw.rect(screen, cancel_color, cancel_rect, border_radius=5)
+        pygame.draw.rect(screen, UI_DANGER, cancel_rect, 2, border_radius=5)
+        cancel_text = FONTS['button'].render("Cancel", True, WHITE)
+        cancel_text_x = cancel_x + (80 - cancel_text.get_width()) // 2
+        cancel_text_y = cancel_y + (40 - cancel_text.get_height()) // 2
+        screen.blit(cancel_text, (cancel_text_x, cancel_text_y))
+        
+        # Instructions
+        instr_text = FONTS['small'].render("Click fields to edit, then press Save", True, (180, 180, 180))
+        instr_x = dialog_x + (dialog_w - instr_text.get_width()) // 2
+        screen.blit(instr_text, (instr_x, dialog_y + dialog_h - 25))
+
     def draw_toolbar(self, screen, screen_w):
         """Draw the modern toolbar"""
         # Background
@@ -536,82 +746,6 @@ class LevelCreator:
             text_x = bg_rect.x + 10
             text_y = bg_rect.y + 5
             screen.blit(text, (text_x, text_y))
-    
-    def draw_save_dialog(self, screen, screen_w, screen_h):
-        """Draw the save level dialog"""
-        dialog_w, dialog_h = 400, 200
-        dialog_x = (screen_w - dialog_w) // 2
-        dialog_y = (screen_h - dialog_h) // 2
-        
-        # Semi-transparent overlay
-        overlay = pygame.Surface((screen_w, screen_h))
-        overlay.set_alpha(128)
-        overlay.fill(BLACK)
-        screen.blit(overlay, (0, 0))
-        
-        # Dialog box
-        dialog_rect = pygame.Rect(dialog_x, dialog_y, dialog_w, dialog_h)
-        pygame.draw.rect(screen, UI_DARK_BG, dialog_rect, border_radius=10)
-        pygame.draw.rect(screen, UI_ACCENT, dialog_rect, 3, border_radius=10)
-        
-        # Title
-        title_text = FONTS['button'].render("Save Level", True, WHITE)
-        title_x = dialog_x + (dialog_w - title_text.get_width()) // 2
-        screen.blit(title_text, (title_x, dialog_y + 20))
-        
-        # Input label
-        label_text = FONTS['hud'].render("Level Name:", True, WHITE)
-        screen.blit(label_text, (dialog_x + 20, dialog_y + 60))
-        
-        # Input box
-        input_rect = pygame.Rect(dialog_x + 20, dialog_y + 90, dialog_w - 40, 30)
-        input_color = UI_ACCENT if self.input_active else UI_MID_BG
-        pygame.draw.rect(screen, input_color, input_rect, border_radius=5)
-        pygame.draw.rect(screen, WHITE, input_rect, 2, border_radius=5)
-        
-        # Input text
-        input_text = FONTS['hud'].render(self.level_name_input, True, WHITE)
-        screen.blit(input_text, (input_rect.x + 10, input_rect.y + 5))
-        
-        # Cursor
-        if self.input_active and pygame.time.get_ticks() % 1000 < 500:
-            cursor_x = input_rect.x + 10 + input_text.get_width()
-            pygame.draw.line(screen, WHITE, (cursor_x, input_rect.y + 5), (cursor_x, input_rect.y + 25), 2)
-        
-        # Cancel button
-        cancel_x = dialog_x + dialog_w - 90
-        cancel_y = dialog_y + dialog_h - 50
-        cancel_rect = pygame.Rect(cancel_x, cancel_y, 80, 40)
-        
-        mx, my = pygame.mouse.get_pos()
-        cancel_hover = cancel_rect.collidepoint(mx, my)
-        cancel_color = UI_DANGER if cancel_hover else UI_MID_BG
-        
-        pygame.draw.rect(screen, cancel_color, cancel_rect, border_radius=5)
-        cancel_text = FONTS['small'].render("Cancel", True, WHITE)
-        cancel_text_x = cancel_x + (80 - cancel_text.get_width()) // 2
-        cancel_text_y = cancel_y + (40 - cancel_text.get_height()) // 2
-        screen.blit(cancel_text, (cancel_text_x, cancel_text_y))
-        
-        # Instructions
-        instr_text = FONTS['small'].render("Press ENTER to save, ESC to cancel", True, (200, 200, 200))
-        instr_x = dialog_x + (dialog_w - instr_text.get_width()) // 2
-        screen.blit(instr_text, (instr_x, dialog_y + dialog_h - 20))
-
-    def find_best_end_point(self):
-        """Find the best end point - farthest path tile from spawn"""
-        max_distance = -1
-        best_end = (GRID_W - 1, GRID_H - 1)  # Default fallback
-        
-        for y in range(GRID_H):
-            for x in range(GRID_W):
-                if self.grid[y][x] == 0:  # Is path tile
-                    distance = abs(x - self.spawn[0]) + abs(y - self.spawn[1])
-                    if distance > max_distance:
-                        max_distance = distance
-                        best_end = (x, y)
-        
-        return best_end
 
 def run_level_creator():
     """Main function to run the level creator"""
@@ -633,4 +767,4 @@ def run_level_creator():
         pygame.display.flip()
         clock.tick(FPS)
     
-    return "quit" 
+    return "menu" 

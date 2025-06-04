@@ -1,6 +1,8 @@
 import sys
 import pygame
 import json
+import time
+import math  # Add math import
 from settings import *
 from menu import MainMenu, LevelSelector, show_level_creator_message
 from level_creator import run_level_creator
@@ -48,6 +50,28 @@ class Game:
                         
         return level_data
     
+    def save_best_time(self, level_file, new_time):
+        """Save a new best time to the level file"""
+        try:
+            with open(level_file, 'r', encoding='utf-8') as f:
+                level_data = json.load(f)
+            
+            # Update best time
+            if 'settings' not in level_data:
+                level_data['settings'] = {}
+            
+            level_data['settings']['best_time'] = new_time
+            
+            # Save back to file
+            with open(level_file, 'w', encoding='utf-8') as f:
+                json.dump(level_data, f, indent=2, ensure_ascii=False)
+            
+            print(f"New best time saved: {new_time:.2f}s")
+            return True
+        except Exception as e:
+            print(f"Error saving best time: {e}")
+            return False
+    
     def run_game_loop(self, level_data):
         level = Level()
         # Initialize Level with loaded level data BEFORE calling recalculate_path
@@ -55,6 +79,10 @@ class Game:
             level.name = level_data['name']
         if 'grid' in level_data:
             level.grid = level_data['grid']
+        
+        # Load level settings
+        level.load_settings(level_data)
+        
         # NOW call recalculate_path with the correct grid data
         level.recalculate_path()
         
@@ -69,9 +97,14 @@ class Game:
         sel = None
         game_over = False
         game_won = False
-        money = STARTING_MONEY
+        money = level.initial_money  # Use level-specific initial money
         selected_tower = None
         current_screen_size = screen.get_size()
+        
+        # Game timing
+        start_time = time.time()
+        current_game_time = 0.0
+        is_new_best_time = False
         
         # Wave completion message display
         wave_message = ""
@@ -94,6 +127,10 @@ class Game:
             dt = clock.tick(FPS)/1000.0
             mouse_pos = pygame.mouse.get_pos()
             current_screen_size = screen.get_size()
+            
+            # Update game time if game is running
+            if not game_over and not game_won:
+                current_game_time = time.time() - start_time
             
             for ev in pygame.event.get():
                 if ev.type == pygame.QUIT:
@@ -173,24 +210,58 @@ class Game:
 
             # Update game logic only if the game is not over
             if not game_over and not game_won:
-                # Store previous wave number to detect wave completion
+                # Store previous wave state to detect completion
+                prev_wave_complete = level.wave_complete
                 prev_wave = level.current_wave
+                
+                # Update map component with enemy status and time
+                game_map.update(dt, level.enemies)
                 
                 level.update(dt)
                 bullets.update(dt)
                 towers.update(dt, level.enemies, bullets)
                 
-                # Check for wave completion reward
-                if level.current_wave > prev_wave:
-                    # Wave completed, give reward
+                # Check if enemies have reached the end and trigger HOME hit animation
+                for e in list(level.enemies):
+                    # Check new version enemy's end reached logic
+                    if hasattr(e, 'path_index') and e.path_index >= len(e.path) - 1:
+                        # Trigger HOME hit animation before removing enemy
+                        game_map.on_home_hit()
+                        level.base_hp -= 1
+                        e.kill()
+                        print(f"Enemy reached HOME! Base HP: {level.base_hp}")
+                    # Compatibility with old version enemy
+                    elif hasattr(e, 'reached_end') and e.reached_end:
+                        # Trigger HOME hit animation before removing enemy
+                        game_map.on_home_hit()
+                        level.base_hp -= getattr(e, 'damage_to_base', 1)
+                        e.kill()
+                        print(f"Enemy reached HOME! Base HP: {level.base_hp}")
+                
+                # Check for wave completion reward - trigger when wave becomes complete
+                if level.wave_complete and not prev_wave_complete:
+                    # Wave just completed, give reward immediately
                     money += WAVE_REWARD
-                    wave_message = f"Wave {prev_wave} Complete! Bonus: +${WAVE_REWARD}"
+                    wave_message = f"Wave {level.current_wave} Complete! Bonus: +${WAVE_REWARD}"
                     wave_message_timer = 0.0
-                    print(f"Wave {prev_wave} completed! Bonus: +${WAVE_REWARD}")
+                    print(f"Wave {level.current_wave} completed! Bonus: +${WAVE_REWARD}")
                 
                 # Check game over condition
                 if level.base_hp <= 0:
                     game_over = True
+                
+                # Check victory condition - all waves complete
+                if level.all_waves_complete:
+                    game_won = True
+                    final_time = current_game_time
+                    
+                    # Check if this is a new best time
+                    if level.best_time is None or final_time < level.best_time:
+                        is_new_best_time = True
+                        if self.current_level_file:
+                            self.save_best_time(self.current_level_file, final_time)
+                    else:
+                        is_new_best_time = False
             
             # Update wave message timer
             if wave_message:
@@ -198,60 +269,38 @@ class Game:
                 if wave_message_timer >= wave_message_duration:
                     wave_message = ""
 
-            # Draw background
+            # Draw screen elements
             current_screen = pygame.display.get_surface()
             current_screen.fill(BG_COLOUR)
-
-            # Draw enhanced toolbar (without wave panel)
-            self.draw_enhanced_toolbar(current_screen, current_screen_size, sel, selected_tower, money, level.base_hp, level.name, level)
-
-            # Draw back button
-            screen_w, screen_h = current_screen_size
-            back_button_rect = pygame.Rect(screen_w - 120, 10, 100, 35)
-            pygame.draw.rect(current_screen, UI_DANGER, back_button_rect)
-            pygame.draw.rect(current_screen, WHITE, back_button_rect, 2)
-            back_text = FONTS['button'].render("Menu", True, WHITE)
-            current_screen.blit(back_text, back_text.get_rect(center=back_button_rect.center))
-
-            # Draw game world
+            
+            # Draw map
             game_map.draw(current_screen)
+            
+            # Draw level
             level.draw(current_screen)
             
-            # Draw towers (using custom draw method)
+            # Draw towers
             for tower in towers:
                 tower.draw(current_screen)
-                
+            
+            # Draw bullets
             bullets.draw(current_screen)
             
-            # Draw visual feedback for demolish mode
-            if selected_tower == "demolish_mode":
-                mx, my = pygame.mouse.get_pos()
-                if my >= UI_HEIGHT:
-                    gx, gy = px_to_grid(mx, my, screen_w, screen_h)
-                    if 0 <= gx < GRID_W and 0 <= gy < GRID_H:
-                        # Check if there is a tower at this position
-                        for tower in towers:
-                            if tower.gx == gx and tower.gy == gy:
-                                # Draw red overlay layer to indicate demolition
-                                scaled_grid_size = get_scaled_grid_size(screen_w, screen_h)
-                                px, py = grid_to_px(gx, gy, screen_w, screen_h)
-                                overlay = pygame.Surface((scaled_grid_size, scaled_grid_size), pygame.SRCALPHA)
-                                overlay.fill((255, 0, 0, 80))
-                                current_screen.blit(overlay, (px, py))
-                                break
+            # Draw UI
+            self.draw_enhanced_toolbar(current_screen, current_screen_size, sel, selected_tower, money, level.base_hp, level.name, level)
             
-            # Draw wave information panel on top of everything
-            self.draw_wave_panel(current_screen, current_screen_size, level)
+            # Draw wave panel with updated format
+            self.draw_wave_panel_with_timing(current_screen, current_screen_size, level, current_game_time)
             
-            # Draw wave completion message in center
+            # Draw wave completion message if active
             if wave_message:
                 self.draw_wave_message(current_screen, current_screen_size, wave_message)
-
-            # Draw game over screen
+            
+            # Draw game over screen if applicable
             if game_over:
-                self.draw_game_over_screen(current_screen, current_screen_size, False)
+                self.draw_game_over_screen(current_screen, current_screen_size, victory=False)
             elif game_won:
-                self.draw_game_over_screen(current_screen, current_screen_size, True)
+                self.draw_victory_screen(current_screen, current_screen_size, current_game_time, level.best_time, is_new_best_time)
             
             pygame.display.flip()
         
@@ -287,127 +336,204 @@ class Game:
         }
 
     def draw_enhanced_toolbar(self, screen, screen_size, selected_type, selected_tower, money, base_hp, level_name, level):
-        """Draw enhanced toolbar"""
+        """Draw enhanced toolbar with improved readability and aesthetics"""
         screen_w, screen_h = screen_size
         
-        # Toolbar background
+        # Dynamic timing for animations
+        time_factor = pygame.time.get_ticks() / 1000.0
+        
+        # Sophisticated toolbar background
         toolbar_rect = pygame.Rect(0, 0, screen_w, UI_HEIGHT)
-        pygame.draw.rect(screen, UI_DARK_BG, toolbar_rect)
-        pygame.draw.rect(screen, UI_LIGHT_BG, toolbar_rect, 3)
+        
+        # Create elegant gradient background
+        toolbar_surface = pygame.Surface((screen_w, UI_HEIGHT), pygame.SRCALPHA)
+        for i in range(UI_HEIGHT):
+            progress = i / UI_HEIGHT
+            alpha = 240 - progress * 20
+            bg_color = (25, 35, 45, int(alpha))  # Rich dark blue
+            pygame.draw.line(toolbar_surface, bg_color, (0, i), (screen_w, i))
+        
+        screen.blit(toolbar_surface, (0, 0))
+        
+        # Elegant border
+        border_pulse = 0.8 + 0.2 * math.sin(time_factor * 2)
+        border_alpha = int(120 * border_pulse)
+        pygame.draw.line(screen, (100, 150, 200, border_alpha), (0, UI_HEIGHT-2), (screen_w, UI_HEIGHT-2), 3)
         
         # Get layout information
         layout = self.get_toolbar_layout(screen_w, screen_h)
         
-        # Draw tower building buttons
+        # Enhanced tower building buttons
+        mx, my = pygame.mouse.get_pos()
+        
         for button_info in layout['tower_buttons']:
             tower_type = button_info['type']
             rect = button_info['rect']
             
-            # Check if selected
+            # Check states
             is_selected = selected_type == tower_type
-            # Check if can afford
             can_afford = money >= TOWER_COSTS[tower_type['name']]
-            # Check hover
-            mouse_pos = pygame.mouse.get_pos()
-            is_hovered = rect.collidepoint(mouse_pos)
+            is_hovered = rect.collidepoint(mx, my) and my < UI_HEIGHT
             
-            # Button background color
+            # Enhanced button appearance
             if is_selected:
-                bg_color = UI_ACCENT
+                bg_color = (80, 120, 160, 200)  # Rich blue selection
+                glow_color = (120, 180, 255, 100)
             elif not can_afford:
-                bg_color = UI_DARK_BG
+                bg_color = (40, 40, 50, 180)    # Dark disabled
+                glow_color = None
             elif is_hovered:
-                bg_color = UI_LIGHT_BG
+                bg_color = (60, 90, 120, 200)   # Medium blue hover
+                glow_color = (100, 150, 200, 80)
             else:
-                bg_color = UI_MID_BG
+                bg_color = (45, 60, 75, 180)    # Default blue-gray
+                glow_color = None
             
-            # Draw button
-            pygame.draw.rect(screen, bg_color, rect, border_radius=8)
-            border_color = tower_type['color'] if can_afford else (100, 100, 100)
-            pygame.draw.rect(screen, border_color, rect, 3, border_radius=8)
+            # Button glow effect
+            if glow_color:
+                for i in range(6, 0, -1):
+                    glow_alpha = glow_color[3] * (i / 6) // 3
+                    glow_rect = pygame.Rect(rect.x - i, rect.y - i, rect.width + i*2, rect.height + i*2)
+                    glow_surface = pygame.Surface((glow_rect.width, glow_rect.height), pygame.SRCALPHA)
+                    glow_surface.fill((*glow_color[:3], glow_alpha))
+                    screen.blit(glow_surface, (glow_rect.x, glow_rect.y))
             
-            # Draw tower type icon (using colored circle)
+            # Draw enhanced button
+            button_surface = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
+            button_surface.fill(bg_color)
+            screen.blit(button_surface, (rect.x, rect.y))
+            
+            # Enhanced border
+            border_color = tower_type['color'] if can_afford else (80, 80, 90)
+            border_thickness = 3 if is_selected else 2
+            pygame.draw.rect(screen, border_color, rect, border_thickness, border_radius=10)
+            
+            # Tower icon with enhanced effects
             center_x = rect.centerx
-            icon_y = rect.y + 20
+            icon_y = rect.y + 22
+            
+            # Icon glow for selected/hovered
+            if is_selected or is_hovered:
+                for radius in range(16, 12, -1):
+                    glow_alpha = 30 if is_selected else 20
+                    pygame.draw.circle(screen, (*tower_type['color'], glow_alpha), (center_x, icon_y), radius)
+            
+            # Main icon
             pygame.draw.circle(screen, tower_type['color'], (center_x, icon_y), 12)
             pygame.draw.circle(screen, WHITE, (center_x, icon_y), 12, 2)
             
-            # Draw tower name
-            name_color = WHITE if can_afford else (120, 120, 120)
+            # Enhanced text with shadows
+            name_color = WHITE if can_afford else (120, 120, 130)
+            name_text = FONTS['small'].render(tower_type['name'], True, (0, 0, 0))
+            screen.blit(name_text, (center_x - name_text.get_width()//2 + 1, icon_y + 26))
             name_text = FONTS['small'].render(tower_type['name'], True, name_color)
-            name_rect = name_text.get_rect(center=(center_x, icon_y + 25))
-            screen.blit(name_text, name_rect)
+            screen.blit(name_text, (center_x - name_text.get_width()//2, icon_y + 25))
             
-            # Draw price
-            cost_color = UI_SUCCESS if can_afford else UI_DANGER
+            # Enhanced price display
+            cost_color = (100, 255, 150) if can_afford else (255, 120, 120)
+            cost_text = FONTS['tiny'].render(f"${TOWER_COSTS[tower_type['name']]}", True, (0, 0, 0))
+            screen.blit(cost_text, (center_x - cost_text.get_width()//2 + 1, icon_y + 42))
             cost_text = FONTS['tiny'].render(f"${TOWER_COSTS[tower_type['name']]}", True, cost_color)
-            cost_rect = cost_text.get_rect(center=(center_x, icon_y + 40))
-            screen.blit(cost_text, cost_rect)
-            
-            # Draw description (on hover)
-            if is_hovered and 'description' in tower_type:
-                desc_text = FONTS['tiny'].render(tower_type['description'], True, WHITE)
-                desc_y = rect.bottom + 5
-                screen.blit(desc_text, (rect.x, desc_y))
+            screen.blit(cost_text, (center_x - cost_text.get_width()//2, icon_y + 41))
         
-        # Draw demolish button
+        # Enhanced demolish button
         demolish_rect = layout['demolish_button']['rect']
         is_demolish_active = selected_tower == "demolish_mode"
-        mouse_pos = pygame.mouse.get_pos()
-        is_demolish_hovered = demolish_rect.collidepoint(mouse_pos)
+        is_demolish_hovered = demolish_rect.collidepoint(mx, my) and my < UI_HEIGHT
         
         if is_demolish_active:
-            bg_color = UI_DANGER
+            bg_color = (160, 80, 80, 200)   # Red active
+            glow_color = (255, 120, 120, 100)
         elif is_demolish_hovered:
-            bg_color = UI_LIGHT_BG
+            bg_color = (120, 60, 60, 200)   # Dark red hover
+            glow_color = (200, 100, 100, 80)
         else:
-            bg_color = UI_MID_BG
+            bg_color = (80, 45, 45, 180)    # Dark red default
+            glow_color = None
         
-        pygame.draw.rect(screen, bg_color, demolish_rect, border_radius=8)
-        pygame.draw.rect(screen, UI_DANGER, demolish_rect, 3, border_radius=8)
+        # Demolish button glow
+        if glow_color:
+            for i in range(6, 0, -1):
+                glow_alpha = glow_color[3] * (i / 6) // 3
+                glow_rect = pygame.Rect(demolish_rect.x - i, demolish_rect.y - i, 
+                                      demolish_rect.width + i*2, demolish_rect.height + i*2)
+                glow_surface = pygame.Surface((glow_rect.width, glow_rect.height), pygame.SRCALPHA)
+                glow_surface.fill((*glow_color[:3], glow_alpha))
+                screen.blit(glow_surface, (glow_rect.x, glow_rect.y))
         
-        # Draw demolish icon (hammer icon)
+        # Draw demolish button
+        demolish_surface = pygame.Surface((demolish_rect.width, demolish_rect.height), pygame.SRCALPHA)
+        demolish_surface.fill(bg_color)
+        screen.blit(demolish_surface, (demolish_rect.x, demolish_rect.y))
+        
+        pygame.draw.rect(screen, (200, 100, 100), demolish_rect, 3, border_radius=10)
+        
+        # Enhanced demolish icon
         center_x, center_y = demolish_rect.center
-        icon_y = demolish_rect.y + 20
+        icon_y = demolish_rect.y + 22
         
-        # Simple hammer icon
-        pygame.draw.circle(screen, UI_DANGER, (center_x, icon_y), 8)
-        pygame.draw.rect(screen, UI_DANGER, (center_x - 2, icon_y, 4, 15))
+        # Hammer icon with glow
+        if is_demolish_active:
+            pygame.draw.circle(screen, (255, 150, 150, 50), (center_x, icon_y), 15)
         
+        pygame.draw.circle(screen, (220, 100, 100), (center_x, icon_y), 8)
+        pygame.draw.rect(screen, (180, 80, 80), (center_x - 2, icon_y, 4, 18))
+        
+        # Enhanced demolish text
+        demolish_text = FONTS['small'].render("Demolish", True, (0, 0, 0))
+        screen.blit(demolish_text, (center_x - demolish_text.get_width()//2 + 1, icon_y + 26))
         demolish_text = FONTS['small'].render("Demolish", True, WHITE)
-        demolish_text_rect = demolish_text.get_rect(center=(center_x, icon_y + 25))
-        screen.blit(demolish_text, demolish_text_rect)
+        screen.blit(demolish_text, (center_x - demolish_text.get_width()//2, icon_y + 25))
         
-        refund_text = FONTS['tiny'].render("50% refund", True, UI_WARNING)
-        refund_rect = refund_text.get_rect(center=(center_x, icon_y + 40))
-        screen.blit(refund_text, refund_rect)
+        refund_text = FONTS['tiny'].render("50% refund", True, (0, 0, 0))
+        screen.blit(refund_text, (center_x - refund_text.get_width()//2 + 1, icon_y + 42))
+        refund_text = FONTS['tiny'].render("50% refund", True, (255, 200, 120))
+        screen.blit(refund_text, (center_x - refund_text.get_width()//2, icon_y + 41))
         
-        # Draw game info panel
-        info_panel_x = screen_w - 300
-        info_panel_w = 280
+        # Enhanced game info panel
+        info_panel_x = screen_w - 320
+        info_panel_w = 300
         info_panel_rect = pygame.Rect(info_panel_x, 10, info_panel_w, UI_HEIGHT - 20)
-        pygame.draw.rect(screen, UI_MID_BG, info_panel_rect, border_radius=8)
-        pygame.draw.rect(screen, UI_LIGHT_BG, info_panel_rect, 2, border_radius=8)
         
-        # Money information
-        money_text = FONTS['hud'].render(f"Money: ${money}", True, UI_WARNING)
-        screen.blit(money_text, (info_panel_x + 15, 25))
+        # Info panel background
+        info_surface = pygame.Surface((info_panel_w, UI_HEIGHT - 20), pygame.SRCALPHA)
+        for i in range(UI_HEIGHT - 20):
+            progress = i / (UI_HEIGHT - 20)
+            alpha = 200 - progress * 30
+            bg_color = (30, 45, 60, int(alpha))
+            pygame.draw.line(info_surface, bg_color, (0, i), (info_panel_w, i))
         
-        # Base health
-        hp_color = UI_SUCCESS if base_hp > 5 else UI_DANGER
-        hp_text = FONTS['hud'].render(f"Base HP: {base_hp}", True, hp_color)
-        screen.blit(hp_text, (info_panel_x + 15, 50))
+        screen.blit(info_surface, (info_panel_x, 10))
+        pygame.draw.rect(screen, (80, 120, 160, 150), info_panel_rect, 2, border_radius=10)
+        
+        # Enhanced info text with shadows
+        def draw_info_text(text, color, x, y):
+            shadow_text = FONTS['hud'].render(text, True, (0, 0, 0))
+            screen.blit(shadow_text, (x + 1, y + 1))
+            main_text = FONTS['hud'].render(text, True, color)
+            screen.blit(main_text, (x, y))
+        
+        # Money with dynamic color
+        money_color = (150, 255, 150) if money >= 50 else (255, 200, 100) if money >= 20 else (255, 150, 150)
+        draw_info_text(f"Money: ${money}", money_color, info_panel_x + 15, 30)
+        
+        # Base health with warning colors
+        hp_color = (150, 255, 150) if base_hp > 7 else (255, 200, 100) if base_hp > 3 else (255, 120, 120)
+        draw_info_text(f"Base HP: {base_hp}", hp_color, info_panel_x + 15, 55)
         
         # Level name
-        level_text = FONTS['hud'].render(f"Level: {level_name}", True, UI_ACCENT)
-        screen.blit(level_text, (info_panel_x + 15, 75))
+        draw_info_text(f"Level: {level_name}", (180, 220, 255), info_panel_x + 15, 80)
         
-        # Draw game title
-        title_text = FONTS['hud'].render("Forest Guard", True, FOREST_GREEN)
-        screen.blit(title_text, (20, 15))
+        # Enhanced game title
+        title_shadow = FONTS['hud'].render("Forest Guard", True, (0, 0, 0))
+        screen.blit(title_shadow, (21, 21))
+        title_text = FONTS['hud'].render("Forest Guard", True, (100, 200, 150))
+        screen.blit(title_text, (20, 20))
         
-        # Draw control hints (removed fullscreen hint)
-        help_text = FONTS['tiny'].render("ESC: Menu", True, (150, 150, 150))
+        # Enhanced control hints
+        help_shadow = FONTS['tiny'].render("ESC: Menu", True, (0, 0, 0))
+        screen.blit(help_shadow, (21, UI_HEIGHT - 24))
+        help_text = FONTS['tiny'].render("ESC: Menu", True, (180, 180, 200))
         screen.blit(help_text, (20, UI_HEIGHT - 25))
 
     def draw_wave_panel(self, screen, screen_size, level):
@@ -440,62 +566,540 @@ class Game:
             screen.blit(progress_text, (wave_panel_x + 10, wave_panel_y + 30))
 
     def draw_wave_message(self, screen, screen_size, message):
-        """Draw wave completion message in center of screen"""
+        """Draw elegant wave completion message with sophisticated effects"""
         screen_w, screen_h = screen_size
         
-        # Semi-transparent background
+        # Dynamic timing for smooth animations
+        time_factor = pygame.time.get_ticks() / 1000.0
+        
+        # Calculate text dimensions
+        main_text = FONTS['title'].render(message, True, WHITE)
+        text_w, text_h = main_text.get_size()
+        
+        # Elegant scaling animation - starts small and grows
+        scale_factor = min(1.0, (time_factor * 2) % 3.0)  # Reset every 3 seconds
+        if scale_factor < 0.3:
+            scale_progress = scale_factor / 0.3
+            panel_scale = 0.3 + 0.7 * (1 - math.cos(scale_progress * math.pi)) / 2
+        else:
+            panel_scale = 1.0
+        
+        # Panel dimensions with elegant proportions
+        base_padding = 50
+        panel_w = int((text_w + base_padding * 2) * panel_scale)
+        panel_h = int((text_h + base_padding * 2) * panel_scale)
+        panel_x = (screen_w - panel_w) // 2
+        panel_y = (screen_h - panel_h) // 2 - 50  # Slightly above center
+        
+        # Subtle background overlay - much more gentle
         overlay = pygame.Surface((screen_w, screen_h), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 100))
+        overlay_alpha = int(40 + 15 * math.sin(time_factor * 2))
+        overlay.fill((10, 30, 10, overlay_alpha))  # Very dark green tint
         screen.blit(overlay, (0, 0))
         
-        # Message panel
-        panel_w, panel_h = 400, 120
-        panel_x = (screen_w - panel_w) // 2
-        panel_y = (screen_h - panel_h) // 2
-        panel_rect = pygame.Rect(panel_x, panel_y, panel_w, panel_h)
+        # Elegant gradient panel with gold/white theme
+        panel_surface = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
         
-        pygame.draw.rect(screen, UI_DARK_BG, panel_rect, border_radius=15)
-        pygame.draw.rect(screen, UI_SUCCESS, panel_rect, 3, border_radius=15)
+        # Create sophisticated gradient
+        for i in range(panel_h):
+            progress = i / panel_h
+            # Elegant white to light gold gradient
+            alpha = int(220 - progress * 40)
+            gold_intensity = int(40 + progress * 30)
+            bg_color = (40 + gold_intensity, 40 + gold_intensity, 40, alpha)
+            pygame.draw.line(panel_surface, bg_color, (0, i), (panel_w, i))
         
-        # Message text
-        text = FONTS['title'].render(message, True, UI_SUCCESS)
-        text_rect = text.get_rect(center=(screen_w // 2, screen_h // 2))
-        screen.blit(text, text_rect)
+        screen.blit(panel_surface, (panel_x, panel_y))
+        
+        # Elegant animated border with soft gold
+        border_pulse = 0.7 + 0.3 * math.sin(time_factor * 3)
+        border_alpha = int(180 * border_pulse)
+        border_color = (220, 180, 100, border_alpha)  # Soft gold
+        
+        # Multiple border layers for depth
+        for thickness in [4, 2, 1]:
+            border_alpha_layer = int(border_alpha * (thickness / 4))
+            border_color_layer = (220, 180, 100, border_alpha_layer)
+            pygame.draw.rect(screen, border_color_layer, 
+                           (panel_x - thickness, panel_y - thickness, 
+                            panel_w + thickness*2, panel_h + thickness*2), 
+                           thickness, border_radius=15 + thickness)
+        
+        # Soft glow effect around panel
+        glow_intensity = 0.3 + 0.2 * math.sin(time_factor * 2.5)
+        for i in range(12, 0, -1):
+            glow_alpha = int(15 * glow_intensity * (i / 12))
+            glow_rect = pygame.Rect(panel_x - i*2, panel_y - i*2, panel_w + i*4, panel_h + i*4)
+            glow_surface = pygame.Surface((glow_rect.width, glow_rect.height), pygame.SRCALPHA)
+            glow_surface.fill((255, 220, 150, glow_alpha))  # Warm golden glow
+            screen.blit(glow_surface, (glow_rect.x, glow_rect.y))
+        
+        # Text with elegant shadow and outline
+        text_x = panel_x + (panel_w - text_w) // 2
+        text_y = panel_y + (panel_h - text_h) // 2
+        
+        # Soft shadow layers
+        for offset in range(3, 0, -1):
+            shadow_alpha = 120 - offset * 30
+            shadow_text = FONTS['title'].render(message, True, (0, 0, 0, shadow_alpha))
+            screen.blit(shadow_text, (text_x + offset, text_y + offset))
+        
+        # Elegant outline - much subtler
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+                if dx != 0 or dy != 0:
+                    outline_text = FONTS['title'].render(message, True, (50, 50, 50, 180))
+                    screen.blit(outline_text, (text_x + dx, text_y + dy))
+        
+        # Main text with soft golden tint
+        text_color = (255, 250, 240)  # Warm white
+        main_text_render = FONTS['title'].render(message, True, text_color)
+        screen.blit(main_text_render, (text_x, text_y))
+        
+        # Elegant sparkle effects around the text
+        sparkle_count = 8
+        for i in range(sparkle_count):
+            angle = (time_factor * 2 + i * math.pi * 2 / sparkle_count) % (math.pi * 2)
+            radius = 80 + 20 * math.sin(time_factor * 3 + i)
+            sparkle_x = panel_x + panel_w // 2 + radius * math.cos(angle)
+            sparkle_y = panel_y + panel_h // 2 + radius * math.sin(angle)
+            
+            sparkle_alpha = int(100 + 80 * math.sin(time_factor * 4 + i))
+            sparkle_size = 2 + int(2 * math.sin(time_factor * 5 + i))
+            
+            # Draw elegant star-like sparkles
+            if sparkle_alpha > 50:
+                sparkle_color = (255, 220, 100, sparkle_alpha)
+                # Create a cross pattern for sparkle
+                pygame.draw.circle(screen, sparkle_color, (int(sparkle_x), int(sparkle_y)), sparkle_size)
+                # Add sparkle lines
+                line_length = sparkle_size * 2
+                pygame.draw.line(screen, sparkle_color, 
+                               (sparkle_x - line_length, sparkle_y), 
+                               (sparkle_x + line_length, sparkle_y), 1)
+                pygame.draw.line(screen, sparkle_color, 
+                               (sparkle_x, sparkle_y - line_length), 
+                               (sparkle_x, sparkle_y + line_length), 1)
 
     def draw_game_over_screen(self, screen, screen_size, victory=False):
-        """Draw game over screen"""
+        """Draw game over screen with clear text and dynamic background"""
         screen_w, screen_h = screen_size
         
-        # Semi-transparent background
+        # Dynamic timing
+        time_factor = pygame.time.get_ticks() / 1000.0
+        
+        # Strong overlay for background contrast
+        overlay_alpha = int(150 + 30 * math.sin(time_factor * 2))
         overlay = pygame.Surface((screen_w, screen_h), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 150))
+        if victory:
+            overlay.fill((0, 50, 0, overlay_alpha))  # Green tint for victory
+        else:
+            overlay.fill((50, 0, 0, overlay_alpha))  # Red tint for defeat
         screen.blit(overlay, (0, 0))
         
-        # Result panel
-        panel_w, panel_h = 400, 200
+        # Content setup
+        if victory:
+            title_text = "VICTORY!"
+            title_color = (100, 255, 100)  # Bright green
+            subtitle = "Mission Accomplished"
+            bg_color = (0, 80, 0)
+        else:
+            title_text = "GAME OVER"
+            title_color = (255, 100, 100)  # Bright red
+            subtitle = "Base Destroyed"
+            bg_color = (80, 0, 0)
+        
+        # Dynamic panel sizing
+        title_size = FONTS['title'].size(title_text)
+        subtitle_size = FONTS['hud'].size(subtitle)
+        instruction_size = FONTS['button'].size("Press ESC to return to menu")
+        
+        max_width = max(title_size[0], subtitle_size[0], instruction_size[0])
+        panel_w = max_width + 120
+        panel_h = 250
+        
+        # Breathing effect for panel
+        breath = 1.0 + 0.05 * math.sin(time_factor * 3)
+        panel_w = int(panel_w * breath)
+        panel_h = int(panel_h * breath)
+        
         panel_x = (screen_w - panel_w) // 2
         panel_y = (screen_h - panel_h) // 2
-        panel_rect = pygame.Rect(panel_x, panel_y, panel_w, panel_h)
         
-        pygame.draw.rect(screen, UI_DARK_BG, panel_rect, border_radius=15)
-        pygame.draw.rect(screen, UI_LIGHT_BG, panel_rect, 3, border_radius=15)
+        # Multi-layer background panel
         
-        # Title
-        if victory:
-            title_text = "Victory!"
-            title_color = UI_SUCCESS
-        else:
-            title_text = "Game Over!"
-            title_color = UI_DANGER
-            
+        # Background panel with strong contrast
+        panel_surface = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
+        for i in range(panel_h):
+            alpha = 220 - (i / panel_h) * 30
+            color = (*bg_color, int(alpha))
+            pygame.draw.line(panel_surface, color, (0, i), (panel_w, i))
+        
+        screen.blit(panel_surface, (panel_x, panel_y))
+        
+        # Animated border
+        border_intensity = int(150 + 50 * math.sin(time_factor * 4))
+        border_color = (*title_color[:2], border_intensity) if len(title_color) == 3 else title_color
+        pygame.draw.rect(screen, border_color, (panel_x, panel_y, panel_w, panel_h), 5, border_radius=20)
+        
+        # Inner glow
+        pygame.draw.rect(screen, (255, 255, 255, 80), (panel_x + 3, panel_y + 3, panel_w - 6, panel_h - 6), 3, border_radius=17)
+        
+        # Title with strong outline and shadow
+        title_y = panel_y + 50
+        
+        # Shadow
+        shadow_text = FONTS['title'].render(title_text, True, (0, 0, 0))
+        screen.blit(shadow_text, (screen_w // 2 - title_size[0] // 2 + 3, title_y + 3))
+        
+        # Outline
+        for dx in [-2, -1, 0, 1, 2]:
+            for dy in [-2, -1, 0, 1, 2]:
+                if dx != 0 or dy != 0:
+                    outline_text = FONTS['title'].render(title_text, True, (0, 0, 0))
+                    screen.blit(outline_text, (screen_w // 2 - title_size[0] // 2 + dx, title_y + dy))
+        
+        # Main title
         title = FONTS['title'].render(title_text, True, title_color)
-        title_rect = title.get_rect(center=(screen_w // 2, panel_y + 60))
-        screen.blit(title, title_rect)
+        screen.blit(title, (screen_w // 2 - title_size[0] // 2, title_y))
         
-        # Instruction text
-        instruction = FONTS['button'].render("Press ESC to return to menu", True, WHITE)
-        instruction_rect = instruction.get_rect(center=(screen_w // 2, panel_y + 130))
-        screen.blit(instruction, instruction_rect)
+        # Subtitle
+        subtitle_y = title_y + 60
+        subtitle_surface = FONTS['hud'].render(subtitle, True, (0, 0, 0))
+        screen.blit(subtitle_surface, (screen_w // 2 - subtitle_size[0] // 2 + 2, subtitle_y + 2))
+        subtitle_surface = FONTS['hud'].render(subtitle, True, (220, 220, 220))
+        screen.blit(subtitle_surface, (screen_w // 2 - subtitle_size[0] // 2, subtitle_y))
+        
+        # Instructions
+        instruction_y = title_y + 120
+        instruction_alpha = int(200 + 55 * math.sin(time_factor * 3))
+        instruction_text = "Press ESC to return to menu"
+        
+        # Shadow
+        instruction_shadow = FONTS['button'].render(instruction_text, True, (0, 0, 0))
+        screen.blit(instruction_shadow, (screen_w // 2 - instruction_size[0] // 2 + 2, instruction_y + 2))
+        
+        # Main text
+        instruction = FONTS['button'].render(instruction_text, True, (255, 255, 255))
+        screen.blit(instruction, (screen_w // 2 - instruction_size[0] // 2, instruction_y))
+
+    def draw_wave_panel_with_timing(self, screen, screen_size, level, current_game_time):
+        """Draw elegant wave panel with excellent readability"""
+        screen_w, screen_h = screen_size
+        
+        # Dynamic timing for smooth animations
+        time_factor = pygame.time.get_ticks() / 1000.0
+        
+        # Calculate content
+        wave_text = f"Wave {level.current_wave}/{level.total_waves}"
+        time_text = f"Time: {current_game_time:.1f}s"
+        
+        # Status text with better colors
+        if level.in_wave_break and not level.all_waves_complete:
+            time_left = level.wave_break_duration - level.wave_break_timer
+            status_text = f"Next wave in: {time_left:.1f}s"
+            status_color = (255, 220, 100)  # Warm yellow
+        elif not level.all_waves_complete:
+            living_enemies = len([e for e in level.enemies if hasattr(e, 'health') and e.health > 0])
+            status_text = f"Enemies: {level.enemies_spawned_this_wave}/{level.enemies_in_wave} (Active: {living_enemies})"
+            status_color = (180, 220, 255)  # Soft blue
+        else:
+            status_text = "All waves complete!"
+            status_color = (150, 255, 150)  # Soft green
+        
+        # Calculate panel size with proper padding
+        texts = [wave_text, status_text, time_text]
+        max_width = max(FONTS['button'].size(wave_text)[0], 
+                       FONTS['small'].size(status_text)[0], 
+                       FONTS['small'].size(time_text)[0])
+        
+        panel_padding = 25
+        panel_w = max_width + panel_padding * 2
+        panel_h = 110
+        panel_x = 20
+        panel_y = screen_h - panel_h - 20
+        
+        # Elegant breathing effect
+        breath = 1.0 + 0.02 * math.sin(time_factor * 2)
+        panel_w = int(panel_w * breath)
+        
+        # Sophisticated background with multiple layers
+        panel_surface = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
+        
+        # Create elegant gradient background
+        for i in range(panel_h):
+            progress = i / panel_h
+            # Rich dark blue to navy gradient for excellent contrast
+            alpha = 240 - (progress * 20)
+            blue_intensity = int(25 + progress * 15)
+            bg_color = (15, 25, blue_intensity + 25, int(alpha))
+            pygame.draw.line(panel_surface, bg_color, (0, i), (panel_w, i))
+        
+        screen.blit(panel_surface, (panel_x, panel_y))
+        
+        # Multi-layer elegant border
+        border_pulse = 0.8 + 0.2 * math.sin(time_factor * 3)
+        
+        # Outer glow effect
+        glow_intensity = 0.4 + 0.3 * math.sin(time_factor * 2)
+        for i in range(8, 0, -1):
+            glow_alpha = int(25 * glow_intensity * (i / 8))
+            glow_rect = pygame.Rect(panel_x - i*2, panel_y - i*2, panel_w + i*4, panel_h + i*4)
+            glow_surface = pygame.Surface((glow_rect.width, glow_rect.height), pygame.SRCALPHA)
+            glow_surface.fill((100, 180, 255, glow_alpha))  # Soft blue glow
+            screen.blit(glow_surface, (glow_rect.x, glow_rect.y))
+        
+        # Main border layers
+        for thickness in [3, 2, 1]:
+            border_alpha = int(180 * border_pulse * (thickness / 3))
+            border_color = (120, 200, 255, border_alpha)  # Elegant blue
+            pygame.draw.rect(screen, border_color, 
+                           (panel_x - thickness//2, panel_y - thickness//2, 
+                            panel_w + thickness, panel_h + thickness), 
+                           thickness, border_radius=12 + thickness)
+        
+        # Inner highlight for depth
+        highlight_alpha = int(60 * border_pulse)
+        pygame.draw.rect(screen, (255, 255, 255, highlight_alpha), 
+                        (panel_x + 2, panel_y + 2, panel_w - 4, panel_h - 4), 
+                        1, border_radius=10)
+        
+        # Text with enhanced readability
+        text_x = panel_x + panel_padding
+        
+        # Helper function for high-contrast text
+        def draw_enhanced_text(text, font, color, x, y):
+            # Strong shadow for depth
+            shadow_text = font.render(text, True, (0, 0, 0))
+            screen.blit(shadow_text, (x + 2, y + 2))
+            
+            # Subtle outline for clarity
+            for dx in [-1, 0, 1]:
+                for dy in [-1, 0, 1]:
+                    if dx != 0 or dy != 0:
+                        outline_text = font.render(text, True, (20, 20, 40))
+                        screen.blit(outline_text, (x + dx, y + dy))
+            
+            # Main text
+            main_text = font.render(text, True, color)
+            screen.blit(main_text, (x, y))
+        
+        # Wave title with enhanced visibility
+        wave_y = panel_y + 15
+        draw_enhanced_text(wave_text, FONTS['button'], (180, 220, 255), text_x, wave_y)
+        
+        # Status text with dynamic colors
+        status_y = panel_y + 45
+        draw_enhanced_text(status_text, FONTS['small'], status_color, text_x, status_y)
+        
+        # Time text with warm golden color
+        time_y = panel_y + 75
+        draw_enhanced_text(time_text, FONTS['small'], (255, 220, 120), text_x, time_y)
+
+    def draw_victory_screen(self, screen, screen_size, current_game_time, best_time, is_new_best_time):
+        """Draw elegant victory screen with sophisticated golden effects"""
+        screen_w, screen_h = screen_size
+        
+        # Dynamic timing for animations
+        time_factor = pygame.time.get_ticks() / 1000.0
+        
+        # Elegant celebration overlay layers
+        overlay_alpha_base = int(60 + 20 * math.sin(time_factor * 1.5))
+        
+        if is_new_best_time:
+            # Rich golden celebration for new record
+            overlay_colors = [
+                (80, 60, 20, overlay_alpha_base),     # Deep golden base
+                (100, 80, 30, overlay_alpha_base + 20), # Brighter gold
+                (120, 100, 40, overlay_alpha_base + 30) # Bright gold highlight
+            ]
+            primary_color = (255, 215, 0)      # Pure gold
+            secondary_color = (255, 240, 150)  # Light gold
+            celebration_text = "★ NEW RECORD ACHIEVED! ★"
+            panel_base_color = (60, 45, 15)    # Dark golden base
+        else:
+            # Elegant golden victory theme
+            overlay_colors = [
+                (60, 50, 20, overlay_alpha_base),     # Warm golden base
+                (80, 70, 30, overlay_alpha_base + 15), # Medium gold
+                (100, 85, 40, overlay_alpha_base + 25) # Bright gold
+            ]
+            primary_color = (255, 200, 100)    # Warm gold
+            secondary_color = (255, 220, 150)  # Light warm gold
+            celebration_text = ""
+            panel_base_color = (50, 40, 15)    # Dark warm base
+        
+        # Multi-layer animated overlay
+        for i, color in enumerate(overlay_colors):
+            wave_offset = math.sin(time_factor * (2 + i * 0.5)) * 20
+            alpha_mod = int(wave_offset)
+            adjusted_color = (color[0], color[1], color[2], max(20, color[3] + alpha_mod))
+            overlay = pygame.Surface((screen_w, screen_h), pygame.SRCALPHA)
+            overlay.fill(adjusted_color)
+            screen.blit(overlay, (0, 0))
+        
+        # Calculate content dimensions
+        title_text = "VICTORY!"
+        if is_new_best_time:
+            subtitle = "NEW BEST TIME!"
+        else:
+            subtitle = "Mission Complete"
+        
+        your_time_text = f"Your Time: {current_game_time:.2f}s"
+        
+        if is_new_best_time:
+            if best_time is None:
+                best_info = "First completion!"
+            else:
+                best_info = f"Previous best: {best_time:.2f}s"
+        else:
+            if best_time is not None:
+                best_info = f"Best Time: {best_time:.2f}s"
+            else:
+                best_info = "No previous best time"
+        
+        instruction_text = "Press ESC to return to menu"
+        
+        # Dynamic panel sizing with elegant proportions
+        texts = [title_text, subtitle, your_time_text, best_info, celebration_text, instruction_text]
+        max_width = max(FONTS['title'].size(title_text)[0],
+                       FONTS['hud'].size(subtitle)[0],
+                       FONTS['hud'].size(your_time_text)[0],
+                       FONTS['hud'].size(best_info)[0],
+                       FONTS['button'].size(celebration_text)[0] if celebration_text else 0,
+                       FONTS['button'].size(instruction_text)[0])
+        
+        panel_w = max_width + 160
+        panel_h = 420 if celebration_text else 380
+        
+        # Elegant pulsing effect for celebration
+        if is_new_best_time:
+            pulse = 1.0 + 0.06 * math.sin(time_factor * 4)
+            panel_w = int(panel_w * pulse)
+            panel_h = int(panel_h * pulse)
+        
+        panel_x = (screen_w - panel_w) // 2
+        panel_y = (screen_h - panel_h) // 2
+        
+        # Sophisticated background panel with rich gradient
+        panel_surface = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
+        
+        # Create luxurious gradient
+        for i in range(panel_h):
+            progress = i / panel_h
+            alpha = 245 - (progress * 25)
+            gold_r = panel_base_color[0] + int(30 + progress * 20)
+            gold_g = panel_base_color[1] + int(25 + progress * 15)
+            gold_b = panel_base_color[2] + int(10 + progress * 5)
+            bg_color = (gold_r, gold_g, gold_b, int(alpha))
+            pygame.draw.line(panel_surface, bg_color, (0, i), (panel_w, i))
+        
+        screen.blit(panel_surface, (panel_x, panel_y))
+        
+        # Spectacular multi-layer glow system
+        glow_intensity = 0.8 + 0.4 * math.sin(time_factor * 3)
+        
+        # Outer spectacular glow
+        for i in range(15, 0, -1):
+            glow_alpha = int(20 * glow_intensity * (i / 15))
+            glow_rect = pygame.Rect(panel_x - i*2, panel_y - i*2, panel_w + i*4, panel_h + i*4)
+            glow_surface = pygame.Surface((glow_rect.width, glow_rect.height), pygame.SRCALPHA)
+            glow_surface.fill((*primary_color[:3], glow_alpha))
+            screen.blit(glow_surface, (glow_rect.x, glow_rect.y))
+        
+        # Elegant border system
+        border_pulse = 0.9 + 0.3 * math.sin(time_factor * 4)
+        for thickness in [5, 3, 2, 1]:
+            border_alpha = int(200 * border_pulse * (thickness / 5))
+            border_color = (*primary_color[:3], border_alpha)
+            pygame.draw.rect(screen, border_color, 
+                           (panel_x - thickness, panel_y - thickness, 
+                            panel_w + thickness*2, panel_h + thickness*2), 
+                           thickness, border_radius=25 + thickness)
+        
+        # Inner luxury highlight
+        highlight_alpha = int(80 * border_pulse)
+        pygame.draw.rect(screen, (255, 255, 255, highlight_alpha), 
+                        (panel_x + 3, panel_y + 3, panel_w - 6, panel_h - 6), 
+                        2, border_radius=22)
+        
+        # Content positioning
+        content_y = panel_y + 50
+        line_spacing = 55
+        
+        # Enhanced text rendering function
+        def draw_luxury_text(text, font, color, x, y, center=True):
+            # Calculate position
+            text_surface = font.render(text, True, color)
+            if center:
+                text_x = x - text_surface.get_width() // 2
+            else:
+                text_x = x
+            
+            # Multiple shadow layers for depth
+            for offset in range(4, 0, -1):
+                shadow_alpha = 150 - offset * 30
+                shadow_text = font.render(text, True, (0, 0, 0, shadow_alpha))
+                screen.blit(shadow_text, (text_x + offset, y + offset))
+            
+            # Elegant outline for definition
+            for dx in [-1, 0, 1]:
+                for dy in [-1, 0, 1]:
+                    if dx != 0 or dy != 0:
+                        outline_text = font.render(text, True, (20, 15, 5))
+                        screen.blit(outline_text, (text_x + dx, y + dy))
+            
+            # Main text with luxury appearance
+            screen.blit(text_surface, (text_x, y))
+        
+        # Render all content with enhanced effects
+        draw_luxury_text(title_text, FONTS['title'], primary_color, screen_w // 2, content_y)
+        content_y += line_spacing + 15
+        
+        draw_luxury_text(subtitle, FONTS['hud'], secondary_color, screen_w // 2, content_y)
+        content_y += line_spacing
+        
+        draw_luxury_text(your_time_text, FONTS['hud'], (255, 255, 240), screen_w // 2, content_y)
+        content_y += line_spacing - 10
+        
+        best_color = (255, 215, 0) if is_new_best_time else (220, 200, 150)
+        draw_luxury_text(best_info, FONTS['hud'], best_color, screen_w // 2, content_y)
+        content_y += line_spacing
+        
+        # Spectacular celebration text for new records
+        if celebration_text:
+            celebration_pulse = 0.9 + 0.3 * math.sin(time_factor * 6)
+            celebration_color = (*primary_color[:3], int(255 * celebration_pulse))
+            draw_luxury_text(celebration_text, FONTS['button'], primary_color, screen_w // 2, content_y)
+            
+            # Add sparkle effects around celebration text
+            sparkle_count = 12
+            for i in range(sparkle_count):
+                angle = (time_factor * 3 + i * math.pi * 2 / sparkle_count) % (math.pi * 2)
+                radius = 120 + 30 * math.sin(time_factor * 4 + i)
+                sparkle_x = screen_w // 2 + radius * math.cos(angle)
+                sparkle_y = content_y + 15 + radius * 0.3 * math.sin(angle)
+                
+                sparkle_alpha = int(120 + 100 * math.sin(time_factor * 5 + i))
+                sparkle_size = 3 + int(2 * math.sin(time_factor * 6 + i))
+                
+                if sparkle_alpha > 70:
+                    sparkle_color = (*primary_color[:3], sparkle_alpha)
+                    # Enhanced star pattern
+                    pygame.draw.circle(screen, sparkle_color, (int(sparkle_x), int(sparkle_y)), sparkle_size)
+                    line_length = sparkle_size * 3
+                    # Create 4-point star
+                    for angle_offset in [0, math.pi/2, math.pi, 3*math.pi/2]:
+                        end_x = sparkle_x + line_length * math.cos(angle_offset)
+                        end_y = sparkle_y + line_length * math.sin(angle_offset)
+                        pygame.draw.line(screen, sparkle_color, 
+                                       (sparkle_x, sparkle_y), (end_x, end_y), 2)
+            
+            content_y += line_spacing
+        
+        # Instructions with elegant fade
+        instruction_alpha = int(220 + 35 * math.sin(time_factor * 2))
+        draw_luxury_text(instruction_text, FONTS['button'], (255, 245, 220), screen_w // 2, content_y)
 
     def run(self):
         while True:
@@ -519,7 +1123,7 @@ class Game:
                 if selected_level is None:
                     self.state = "menu"
                 else:
-                    self.current_level_file = selected_level
+                    self.current_level_file = selected_level  # Store level file path
                     level_data = self.load_level_from_file(selected_level)
                     if level_data:
                         result = self.run_game_loop(level_data)

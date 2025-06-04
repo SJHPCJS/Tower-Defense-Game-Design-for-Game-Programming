@@ -15,6 +15,7 @@ class Level:
         
         # Wave system
         self.current_wave = 1
+        self.total_waves = 5  # Default total waves
         self.enemies_in_wave = 10  # Base number of enemies per wave
         self.enemies_spawned_this_wave = 0
         self.enemies_killed_this_wave = 0
@@ -23,8 +24,32 @@ class Level:
         self.wave_break_duration = 3.0  # 3 seconds between waves
         self.in_wave_break = False
         
+        # Level settings from JSON
+        self.initial_money = STARTING_MONEY
+        self.enemy_speed = 50  # Base enemy speed
+        self.best_time = None
+        
+        # Game completion state
+        self.all_waves_complete = False
+        
         # Remove automatic path initialization - will be called manually after grid is set
         # self.recalculate_path()  # Commented out
+    
+    def load_settings(self, level_data):
+        """Load level settings from JSON data"""
+        if 'settings' in level_data:
+            settings = level_data['settings']
+            self.initial_money = settings.get('initial_money', STARTING_MONEY)
+            self.total_waves = settings.get('wave_count', 5)
+            self.enemy_speed = settings.get('enemy_speed', 50)
+            self.best_time = settings.get('best_time', None)
+            print(f"Level settings: Money=${self.initial_money}, Waves={self.total_waves}, Speed={self.enemy_speed}")
+        else:
+            # Default settings for backward compatibility
+            self.initial_money = STARTING_MONEY
+            self.total_waves = 5
+            self.enemy_speed = 50
+            self.best_time = None
     
     def recalculate_path(self):
         """Recalculate path, called when the level changes"""
@@ -89,7 +114,7 @@ class Level:
         # Count living enemies (not dead or reached end)
         living_enemies = [e for e in self.enemies if hasattr(e, 'health') and e.health > 0]
         
-        # Check if wave is complete
+        # Check if current wave is complete
         if (not self.wave_complete and 
             self.enemies_spawned_this_wave >= self.enemies_in_wave and 
             len(living_enemies) == 0):
@@ -98,8 +123,12 @@ class Level:
             self.wave_break_timer = 0.0
             print(f"Wave {self.current_wave} completed! All {self.enemies_in_wave} enemies defeated!")
         
+        # Check if all waves are complete
+        if self.wave_complete and self.current_wave >= self.total_waves:
+            self.all_waves_complete = True
+        
         # Handle wave break
-        if self.in_wave_break:
+        if self.in_wave_break and not self.all_waves_complete:
             self.wave_break_timer += dt
             if self.wave_break_timer >= self.wave_break_duration:
                 # Start next wave
@@ -114,7 +143,7 @@ class Level:
                 print(f"Wave {self.current_wave} starting! {self.enemies_in_wave} enemies, {self.delay:.1f}s delay")
         
         # Spawn enemies if not in wave break and haven't spawned all enemies for this wave
-        if not self.in_wave_break and self.enemies_spawned_this_wave < self.enemies_in_wave:
+        if not self.in_wave_break and self.enemies_spawned_this_wave < self.enemies_in_wave and not self.all_waves_complete:
             self.timer += dt
             if self.timer >= self.delay:
                 self.timer -= self.delay
@@ -122,6 +151,8 @@ class Level:
                 if self.start and self.end:
                     # Create enemy with grid context
                     enemy = EnemyWithGrid(self.start, self.end, self.grid if self.grid is not None else GRID_MAP)
+                    # Apply level-specific enemy speed
+                    enemy.speed = self.enemy_speed
                     # Set kill callback if available
                     if hasattr(self, 'kill_callback') and self.kill_callback:
                         enemy.kill_callback = self.kill_callback
@@ -129,18 +160,7 @@ class Level:
                     self.enemies_spawned_this_wave += 1
                     print(f"Spawned enemy {self.enemies_spawned_this_wave}/{self.enemies_in_wave}")
         
-        # Check if enemies have reached the end
-        for e in list(self.enemies):
-            # Check new version enemy's end reached logic
-            if hasattr(e, 'path_index') and e.path_index >= len(e.path) - 1:
-                self.base_hp -= 1
-                e.kill()
-                print(f"Enemy reached end! Base HP: {self.base_hp}")
-            # Compatibility with old version enemy
-            elif hasattr(e, 'reached_end') and e.reached_end:
-                self.base_hp -= getattr(e, 'damage_to_base', 1)
-                e.kill()
-                print(f"Enemy reached end! Base HP: {self.base_hp}")
+        # Note: Enemy end-reached logic moved to game.py for HOME animation integration
 
     def draw(self, surf):
         for e in self.enemies:

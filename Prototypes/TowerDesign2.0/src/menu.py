@@ -127,6 +127,13 @@ class LevelSelector:
         self.buttons = []
         self.back_button = Button(30, 30, 120, 50, "← Back", color=BROWN, hover_color=RED)
         self.title_font = pygame.font.SysFont('Arial', 48, bold=True)
+        
+        # Delete functionality
+        self.delete_mode = False
+        self.delete_button = None
+        self.confirm_delete_dialog = False
+        self.level_to_delete = None
+        
         self.load_levels()
         
     def load_levels(self):
@@ -147,6 +154,8 @@ class LevelSelector:
         start_x = DEFAULT_SCREEN_W // 2 - (cols * button_width + (cols - 1) * 20) // 2
         start_y = 150
         
+        self.buttons.clear()
+        
         for i, level_file in enumerate(level_files):
             col = i % cols
             row = i // cols
@@ -158,6 +167,14 @@ class LevelSelector:
             button = Button(x, y, button_width, button_height, level_name)
             button.level_file = level_file  # Store the filename
             self.buttons.append(button)
+        
+        # Create delete button (bottom-right corner)
+        screen = pygame.display.get_surface()
+        if screen:
+            screen_w, screen_h = screen.get_size()
+            delete_x = screen_w - 140
+            delete_y = screen_h - 80
+            self.delete_button = Button(delete_x, delete_y, 120, 50, "Delete Level", color=UI_DANGER, hover_color=RED)
     
     def draw_background(self, screen):
         screen_w, screen_h = screen.get_size()
@@ -168,6 +185,86 @@ class LevelSelector:
             g = int(206 + (216 - 206) * color_ratio)
             b = int(235 + (230 - 235) * color_ratio)
             pygame.draw.line(screen, (r, g, b), (0, y), (screen_w, y))
+
+    def draw_confirm_delete_dialog(self, screen, screen_w, screen_h):
+        """Draw the delete confirmation dialog"""
+        if not self.level_to_delete:
+            return
+        
+        dialog_w, dialog_h = 400, 200
+        dialog_x = (screen_w - dialog_w) // 2
+        dialog_y = (screen_h - dialog_h) // 2
+        
+        # Semi-transparent overlay
+        overlay = pygame.Surface((screen_w, screen_h), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 150))
+        screen.blit(overlay, (0, 0))
+        
+        # Dialog box
+        dialog_rect = pygame.Rect(dialog_x, dialog_y, dialog_w, dialog_h)
+        pygame.draw.rect(screen, UI_DARK_BG, dialog_rect, border_radius=15)
+        pygame.draw.rect(screen, UI_DANGER, dialog_rect, 3, border_radius=15)
+        
+        # Title
+        title_text = FONTS['title'].render("Confirm Delete", True, UI_DANGER)
+        title_rect = title_text.get_rect(center=(screen_w // 2, dialog_y + 50))
+        screen.blit(title_text, title_rect)
+        
+        # Warning message
+        level_name = self.level_to_delete.replace('.json', '')
+        warning_text = FONTS['hud'].render(f"Delete level '{level_name}'?", True, WHITE)
+        warning_rect = warning_text.get_rect(center=(screen_w // 2, dialog_y + 90))
+        screen.blit(warning_text, warning_rect)
+        
+        warning2_text = FONTS['small'].render("This action cannot be undone!", True, UI_WARNING)
+        warning2_rect = warning2_text.get_rect(center=(screen_w // 2, dialog_y + 115))
+        screen.blit(warning2_text, warning2_rect)
+        
+        # Buttons
+        # Confirm button
+        confirm_x = dialog_x + dialog_w // 2 - 90
+        confirm_y = dialog_y + dialog_h - 60
+        confirm_rect = pygame.Rect(confirm_x, confirm_y, 80, 40)
+        
+        mx, my = pygame.mouse.get_pos()
+        confirm_hover = confirm_rect.collidepoint(mx, my)
+        confirm_color = RED if confirm_hover else UI_DANGER
+        
+        pygame.draw.rect(screen, confirm_color, confirm_rect, border_radius=5)
+        confirm_text = FONTS['button'].render("Delete", True, WHITE)
+        confirm_text_rect = confirm_text.get_rect(center=confirm_rect.center)
+        screen.blit(confirm_text, confirm_text_rect)
+        
+        # Cancel button
+        cancel_x = dialog_x + dialog_w // 2 + 10
+        cancel_y = dialog_y + dialog_h - 60
+        cancel_rect = pygame.Rect(cancel_x, cancel_y, 80, 40)
+        
+        cancel_hover = cancel_rect.collidepoint(mx, my)
+        cancel_color = UI_LIGHT_BG if cancel_hover else UI_MID_BG
+        
+        pygame.draw.rect(screen, cancel_color, cancel_rect, border_radius=5)
+        cancel_text = FONTS['button'].render("Cancel", True, WHITE)
+        cancel_text_rect = cancel_text.get_rect(center=cancel_rect.center)
+        screen.blit(cancel_text, cancel_text_rect)
+        
+        return confirm_rect, cancel_rect
+
+    def delete_level_file(self, level_file):
+        """Delete a level file"""
+        try:
+            levels_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "levels")
+            filepath = os.path.join(levels_dir, level_file)
+            if os.path.exists(filepath):
+                os.remove(filepath)
+                print(f"Deleted level: {level_file}")
+                return True
+            else:
+                print(f"Level file not found: {level_file}")
+                return False
+        except Exception as e:
+            print(f"Error deleting level: {e}")
+            return False
     
     def run(self):
         while True:
@@ -180,18 +277,69 @@ class LevelSelector:
                     new_width = max(event.w, MIN_SCREEN_W)
                     new_height = max(event.h, MIN_SCREEN_H)
                     pygame.display.set_mode((new_width, new_height), pygame.RESIZABLE | pygame.DOUBLEBUF)
+                    # Recreate delete button with new position
+                    screen_w, screen_h = new_width, new_height
+                    delete_x = screen_w - 140
+                    delete_y = screen_h - 80
+                    self.delete_button = Button(delete_x, delete_y, 120, 50, "Delete Level", color=UI_DANGER, hover_color=RED)
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_F11:
                         # Toggle fullscreen
                         pygame.display.toggle_fullscreen()
+                    elif event.key == pygame.K_ESCAPE:
+                        if self.confirm_delete_dialog:
+                            self.confirm_delete_dialog = False
+                            self.level_to_delete = None
+                        elif self.delete_mode:
+                            self.delete_mode = False
+                        else:
+                            return None
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    mx, my = event.pos
+                    current_screen = pygame.display.get_surface()
+                    screen_w, screen_h = current_screen.get_size()
+                    
+                    if self.confirm_delete_dialog:
+                        # Handle delete confirmation dialog
+                        confirm_rect, cancel_rect = self.draw_confirm_delete_dialog(current_screen, screen_w, screen_h)
+                        
+                        if confirm_rect and confirm_rect.collidepoint(mx, my):
+                            # Confirm delete
+                            if self.delete_level_file(self.level_to_delete):
+                                self.load_levels()  # Reload level list
+                            self.confirm_delete_dialog = False
+                            self.level_to_delete = None
+                            self.delete_mode = False
+                        elif cancel_rect and cancel_rect.collidepoint(mx, my):
+                            # Cancel delete
+                            self.confirm_delete_dialog = False
+                            self.level_to_delete = None
+                    else:
+                        # Normal button handling
+                        if self.back_button.handle_event(event):
+                            return None
+                        
+                        if self.delete_button and self.delete_button.handle_event(event):
+                            self.delete_mode = not self.delete_mode
+                        
+                        for button in self.buttons:
+                            if button.handle_event(event):
+                                if self.delete_mode:
+                                    # Show delete confirmation
+                                    self.level_to_delete = button.level_file
+                                    self.confirm_delete_dialog = True
+                                else:
+                                    # Normal level selection
+                                    levels_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "levels")
+                                    return os.path.join(levels_dir, button.level_file)
                 
-                if self.back_button.handle_event(event):
-                    return None
-                
-                for button in self.buttons:
-                    if button.handle_event(event):
-                        levels_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "levels")
-                        return os.path.join(levels_dir, button.level_file)
+                # Handle button hover states
+                if not self.confirm_delete_dialog:
+                    self.back_button.handle_event(event)
+                    if self.delete_button:
+                        self.delete_button.handle_event(event)
+                    for button in self.buttons:
+                        button.handle_event(event)
             
             current_screen = pygame.display.get_surface()
             screen_w, screen_h = current_screen.get_size()
@@ -199,23 +347,15 @@ class LevelSelector:
             # Dynamically adjust button positions
             cols = 3
             button_width, button_height = 200, 80
-            available_width = screen_w - 100  # Leave some margin
-            if available_width < cols * button_width + (cols - 1) * 20:
-                cols = max(1, available_width // (button_width + 20))
-            
             start_x = screen_w // 2 - (cols * button_width + (cols - 1) * 20) // 2
-            start_y = 200
+            start_y = 150
             
-            # Re-adjust button positions
             for i, button in enumerate(self.buttons):
                 col = i % cols
                 row = i // cols
                 x = start_x + col * (button_width + 20)
                 y = start_y + row * (button_height + 20)
                 button.rect = pygame.Rect(x, y, button_width, button_height)
-            
-            # Re-adjust back button position
-            self.back_button.rect = pygame.Rect(30, 30, 120, 50)
             
             self.draw_background(current_screen)
             
@@ -228,18 +368,40 @@ class LevelSelector:
             current_screen.blit(title_shadow, shadow_rect)
             current_screen.blit(title, title_rect)
             
+            # Draw level buttons
+            for button in self.buttons:
+                # Highlight buttons in delete mode
+                if self.delete_mode:
+                    button.color = UI_DANGER
+                    button.hover_color = RED
+                else:
+                    button.color = FOREST_GREEN
+                    button.hover_color = LIGHT_GREEN
+                button.draw(current_screen)
+            
             # Draw back button
             self.back_button.draw(current_screen)
             
-            # Draw level buttons
-            for button in self.buttons:
-                button.draw(current_screen)
+            # Draw delete button
+            if self.delete_button:
+                # Change appearance based on delete mode
+                if self.delete_mode:
+                    self.delete_button.color = RED
+                    self.delete_button.text = "Cancel Delete"
+                else:
+                    self.delete_button.color = UI_DANGER
+                    self.delete_button.text = "Delete Level"
+                self.delete_button.draw(current_screen)
             
-            # If no levels found, show message
-            if not self.buttons:
-                no_levels_text = pygame.font.SysFont('Arial', 32).render("No levels found!", True, RED)
-                text_rect = no_levels_text.get_rect(center=(screen_w // 2, screen_h // 2))
-                current_screen.blit(no_levels_text, text_rect)
+            # Draw mode indicator
+            if self.delete_mode:
+                mode_text = FONTS['hud'].render("DELETE MODE: Click a level to delete it", True, RED)
+                mode_rect = mode_text.get_rect(center=(screen_w // 2, screen_h - 120))
+                current_screen.blit(mode_text, mode_rect)
+            
+            # Draw confirmation dialog if active
+            if self.confirm_delete_dialog:
+                self.draw_confirm_delete_dialog(current_screen, screen_w, screen_h)
             
             pygame.display.flip()
             clock.tick(FPS)
