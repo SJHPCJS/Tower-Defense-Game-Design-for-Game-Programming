@@ -72,7 +72,7 @@ class StartSprite:
         return sprite
 
 class HomeSprite:
-    """HOME sprite sheet 动画类，支持多种状态"""
+    """HOME sprite sheet 动画类，支持多种状态和蒙版效果"""
     
     def __init__(self):
         self.load_sprite_sheet()
@@ -84,6 +84,11 @@ class HomeSprite:
         self.state = "idle"  # idle(正常), active(有敌人), hit(受到攻击)
         self.hit_timer = 0.0
         self.hit_duration = 1.2  # 受击状态持续时间（稍微长一点）
+        
+        # 蒙版闪烁系统
+        self.mask_timer = 0.0
+        self.mask_flash_duration = 0.5  # 闪烁周期
+        self.show_mask = False  # 当前是否显示蒙版
         
         # 帧索引定义（2x2 sprite sheet）
         self.frames = {
@@ -130,6 +135,7 @@ class HomeSprite:
             self.state = new_state
             self.current_frame = 0
             self.frame_timer = 0.0
+            self.mask_timer = 0.0  # 重置蒙版计时器
             
             if new_state == "hit":
                 self.hit_timer = 0.0
@@ -149,7 +155,7 @@ class HomeSprite:
         self.set_state("hit")
     
     def update(self, dt):
-        """更新动画状态"""
+        """更新动画状态和蒙版闪烁"""
         # 更新受击状态计时器
         if self.state == "hit":
             self.hit_timer += dt
@@ -159,6 +165,15 @@ class HomeSprite:
                 self.hit_timer = 0.0
                 self.state = "checking"  # 临时状态，等待MapComponent检查
                 return
+        
+        # 更新蒙版闪烁（仅在active和hit状态下）
+        if self.state in ["active", "hit"]:
+            self.mask_timer += dt
+            if self.mask_timer >= self.mask_flash_duration:
+                self.mask_timer = 0.0
+                self.show_mask = not self.show_mask
+        else:
+            self.show_mask = False  # idle状态不显示蒙版
         
         # 更新动画帧
         current_frames = self.frames[self.state]
@@ -175,7 +190,23 @@ class HomeSprite:
         sprite = self.sprite_frames[frame_index]
         
         if size != sprite.get_size():
-            return pygame.transform.scale(sprite, size)
+            sprite = pygame.transform.scale(sprite, size)
+        
+        # 如果需要显示蒙版，应用颜色蒙版
+        if self.show_mask:
+            mask_surface = pygame.Surface(size, pygame.SRCALPHA)
+            if self.state == "active":
+                # 黄色蒙版（敌人接近）
+                mask_surface.fill((255, 255, 0, 80))  # 半透明黄色
+            elif self.state == "hit":
+                # 红色蒙版（受到攻击）
+                mask_surface.fill((255, 0, 0, 120))  # 半透明红色
+            
+            # 创建带蒙版的合成图像
+            combined = sprite.copy()
+            combined.blit(mask_surface, (0, 0), special_flags=pygame.BLEND_ALPHA_SDL2)
+            return combined
+        
         return sprite
 
 class MapComponent:
@@ -293,30 +324,26 @@ class MapComponent:
                 pos_y = y * scaled_grid_size
                 game_surface.blit(scaled_imgs[t], (pos_x, pos_y))
         
-        # Draw markers
+        # Draw markers with 1.25x scaling and centering
         sx, sy = self.spawn
         hx, hy = self.home
         
-        # START marker - 使用sprite动画
-        start_sprite = self.start_sprite.get_current_sprite((scaled_grid_size, scaled_grid_size))
-        start_pos = (sx * scaled_grid_size, sy * scaled_grid_size)
+        # Calculate 1.25x scaled size
+        marker_size = int(scaled_grid_size * 1.25)
+        
+        # START marker - 使用sprite动画，1.25x缩放并居中
+        start_sprite = self.start_sprite.get_current_sprite((marker_size, marker_size))
+        start_offset_x = (scaled_grid_size - marker_size) // 2
+        start_offset_y = (scaled_grid_size - marker_size) // 2
+        start_pos = (sx * scaled_grid_size + start_offset_x, sy * scaled_grid_size + start_offset_y)
         game_surface.blit(start_sprite, start_pos)
         
-        # HOME marker - 使用sprite动画
-        home_sprite = self.home_sprite.get_current_sprite((scaled_grid_size, scaled_grid_size))
-        home_pos = (hx * scaled_grid_size, hy * scaled_grid_size)
+        # HOME marker - 使用sprite动画，1.25x缩放并居中
+        home_sprite = self.home_sprite.get_current_sprite((marker_size, marker_size))
+        home_offset_x = (scaled_grid_size - marker_size) // 2
+        home_offset_y = (scaled_grid_size - marker_size) // 2
+        home_pos = (hx * scaled_grid_size + home_offset_x, hy * scaled_grid_size + home_offset_y)
         game_surface.blit(home_sprite, home_pos)
-        
-        # 添加HOME边框
-        home_rect = pygame.Rect(hx * scaled_grid_size, hy * scaled_grid_size, scaled_grid_size, scaled_grid_size)
-        home_state = self.home_sprite.state
-        if home_state == "idle" or home_state == "checking":
-            border_color = (0, 255,  0) 
-        elif home_state == "active":
-            border_color = (255, 255, 0)    # 黄色：有敌人
-        else:  # hit状态
-            border_color = (255, 0, 0)      # 红色：受击
-        pygame.draw.rect(game_surface, border_color, home_rect, 3)
         
         return game_surface, (int(offset_x), int(offset_y))
 

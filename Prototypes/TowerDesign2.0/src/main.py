@@ -3,7 +3,7 @@ from settings import *
 from grid import GRID_MAP
 from map_component import MapComponent
 from level import Level
-from tower import Tower
+from tower import TowerFactory
 from bullet import Bullet
 
 def main():
@@ -36,7 +36,7 @@ def main():
                     gx=mx//GRID_SIZE
                     gy=(my-UI_HEIGHT)//GRID_SIZE
                     if 0<=gx<GRID_W and 0<=gy<GRID_H and GRID_MAP[gy][gx]==1 and sel:
-                        towers.add(Tower(gx,gy,sel)); sel=None
+                        towers.add(TowerFactory.create_tower(sel, gx, gy)); sel=None
 
         level.update(dt)
         bullets.update(dt)
@@ -55,9 +55,9 @@ def main():
 
         game_map.draw(screen)
         level.draw(screen)
-        towers.draw(screen)
+        for tower in towers:
+            tower.draw(screen)
         bullets.draw(screen)
-
         pygame.display.flip()
 
     pygame.quit(); sys.exit()

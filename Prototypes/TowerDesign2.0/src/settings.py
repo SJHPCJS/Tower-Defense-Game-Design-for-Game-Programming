@@ -54,14 +54,16 @@ UI_WARNING = (255, 193, 7)
 UI_DANGER = (220, 53, 69)
 
 # Game settings
-STARTING_MONEY = 100
+STARTING_MONEY = 200
 TOWER_COSTS = {
-    'Fast': 40,
-    'Strong': 40,
-    'Balanced': 20
+    'Emberwing': 25,
+    'Volt Cow': 25,
+    'Banana Blaster': 20,
+    'Wood Sage': 15,
+    'Chrono Cactus': 25
 }
-WAVE_REWARD = 50
-KILL_REWARD = 1
+WAVE_REWARD = 80
+KILL_REWARD = 2
 
 # Enemy colors
 ENEMY_COLORS = {
@@ -77,11 +79,13 @@ BUTTON_COLORS = {
     'pressed': DARK_GREEN
 }
 
-# tower definitions
+# tower definitions - Only the 5 new towers
 TOWER_TYPES = [
-    {'name':'Fast',     'damage':10, 'rof':0.3, 'color':(200,200,255), 'description': 'High attack speed, low damage'},
-    {'name':'Strong',   'damage':30, 'rof':1.2, 'color':(255,200,200), 'description': 'High damage, slow attack speed'},
-    {'name':'Balanced', 'damage':20, 'rof':0.6, 'color':(200,255,200), 'description': 'Balanced damage and speed'},
+    {'name':'Emberwing', 'damage':45, 'rof':0.9, 'color':(255,140,100), 'description': 'Fire-based ranged attacker'},
+    {'name':'Volt Cow', 'damage':65, 'rof':1.2, 'color':(255,255,100), 'description': 'Electric-powered heavy hitter'},
+    {'name':'Banana Blaster', 'damage':25, 'rof':0.3, 'color':(255,255,150), 'description': 'Fast banana projectiles'},
+    {'name':'Wood Sage', 'damage':35, 'rof':0.8, 'color':(139,195,74), 'description': 'Nature-powered defender'},
+    {'name':'Chrono Cactus', 'damage':0, 'rof':0, 'color':(76,175,80), 'description': 'Slows nearby enemies by 25%', 'slow_range': 5, 'slow_effect': 0.25},
 ]
 
 

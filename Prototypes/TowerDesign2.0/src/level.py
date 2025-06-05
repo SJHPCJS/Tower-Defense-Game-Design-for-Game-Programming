@@ -1,6 +1,7 @@
 import pygame
+import random
 from settings import *
-from enemy import Enemy, EnemyWithGrid
+from enemy import EnemyFactory, EnemyWithGrid
 from pathfinding import a_star
 from grid import GRID_MAP
 
@@ -8,7 +9,7 @@ class Level:
     def __init__(self):
         self.enemies = pygame.sprite.Group()
         self.timer = 0.0
-        self.delay = 2.0  # Base delay between enemies
+        self.delay = 0.5  # Adjusted from 0.3 to 0.5 for better balance
         self.base_hp = 10
         self.name = "Default Level"
         self.grid = None
@@ -16,13 +17,18 @@ class Level:
         # Wave system
         self.current_wave = 1
         self.total_waves = 5  # Default total waves
-        self.enemies_in_wave = 10  # Base number of enemies per wave
+        self.enemies_in_wave = 10
         self.enemies_spawned_this_wave = 0
         self.enemies_killed_this_wave = 0
         self.wave_complete = False
         self.wave_break_timer = 0.0
-        self.wave_break_duration = 3.0  # 3 seconds between waves
+        self.wave_break_duration = 8.0  # Increased from 5.0 to 8.0 seconds for more building time
         self.in_wave_break = False
+        
+        # Enemy wave composition
+        self.wave_composition = {}
+        self.current_enemy_queue = []
+        self.enemy_spawn_index = 0
         
         # Level settings from JSON
         self.initial_money = STARTING_MONEY
@@ -107,6 +113,22 @@ class Level:
         # If no path point found, return start point
         return start
 
+    def prepare_wave_composition(self):
+        """Prepare the enemy composition for the current wave"""
+        self.wave_composition = EnemyFactory.get_wave_composition(self.current_wave, self.enemies_in_wave)
+        
+        # Create enemy spawn queue
+        self.current_enemy_queue = []
+        for enemy_type, count in self.wave_composition.items():
+            for _ in range(count):
+                self.current_enemy_queue.append(enemy_type)
+        
+        # Shuffle the queue for random spawn order
+        random.shuffle(self.current_enemy_queue)
+        self.enemy_spawn_index = 0
+        
+        print(f"Wave {self.current_wave} composition: {self.wave_composition}")
+
     def update(self, dt):
         # Update enemies
         self.enemies.update(dt)
@@ -133,34 +155,65 @@ class Level:
             if self.wave_break_timer >= self.wave_break_duration:
                 # Start next wave
                 self.current_wave += 1
-                self.enemies_in_wave = int(10 + (self.current_wave - 1) * 5)  # Increase enemies per wave
-                self.delay = max(0.5, 2.0 - (self.current_wave - 1) * 0.1)  # Decrease spawn delay
+                self.enemies_in_wave = int(20 + (self.current_wave - 1) * 8)  # Increased from 10 + 5 to 20 + 8
+                self.delay = max(0.3, 0.5 - (self.current_wave - 1) * 0.03)  # Slightly slower progression
                 self.enemies_spawned_this_wave = 0
                 self.enemies_killed_this_wave = 0
                 self.wave_complete = False
                 self.in_wave_break = False
                 self.timer = 0.0
-                print(f"Wave {self.current_wave} starting! {self.enemies_in_wave} enemies, {self.delay:.1f}s delay")
+                
+                # Prepare new wave composition
+                self.prepare_wave_composition()
+                
+                print(f"Wave {self.current_wave} starting! {self.enemies_in_wave} enemies, {self.delay:.2f}s delay")
         
         # Spawn enemies if not in wave break and haven't spawned all enemies for this wave
         if not self.in_wave_break and self.enemies_spawned_this_wave < self.enemies_in_wave and not self.all_waves_complete:
             self.timer += dt
             if self.timer >= self.delay:
                 self.timer -= self.delay
-                # Create enemy with start and end points
-                if self.start and self.end:
-                    # Create enemy with grid context
-                    enemy = EnemyWithGrid(self.start, self.end, self.grid if self.grid is not None else GRID_MAP)
-                    # Apply level-specific enemy speed
-                    enemy.speed = self.enemy_speed
-                    # Set kill callback if available
-                    if hasattr(self, 'kill_callback') and self.kill_callback:
-                        enemy.kill_callback = self.kill_callback
-                    self.enemies.add(enemy)
-                    self.enemies_spawned_this_wave += 1
-                    print(f"Spawned enemy {self.enemies_spawned_this_wave}/{self.enemies_in_wave}")
+                
+                # Spawn enemy from the queue
+                if self.enemy_spawn_index < len(self.current_enemy_queue):
+                    enemy_type = self.current_enemy_queue[self.enemy_spawn_index]
+                    self.enemy_spawn_index += 1
+                    
+                    # Create enemy with start and end points
+                    if self.start and self.end:
+                        # Use factory to create the appropriate enemy type
+                        if hasattr(self, 'grid') and self.grid is not None:
+                            # Calculate path for this specific enemy
+                            path = a_star(self.start, self.end, self.grid)
+                            if path:
+                                enemy = EnemyFactory.create_enemy(enemy_type, path)
+                            else:
+                                print(f"Failed to create path for {enemy_type}, skipping")
+                                return
+                        else:
+                            # Use global grid
+                            enemy = EnemyFactory.create_enemy(enemy_type, self.start, self.end)
+                        
+                        # Apply level-specific enemy speed scaling (if different from default)
+                        if self.enemy_speed != 50:  # Only apply if different from default base speed
+                            speed_scale = self.enemy_speed / 50.0
+                            enemy.speed = int(enemy.original_speed * speed_scale)
+                            enemy.original_speed = enemy.speed
+                        
+                        # Set kill callback if available
+                        if hasattr(self, 'kill_callback') and self.kill_callback:
+                            enemy.kill_callback = self.kill_callback
+                        
+                        self.enemies.add(enemy)
+                        self.enemies_spawned_this_wave += 1
+                        print(f"Spawned {enemy_type} {self.enemies_spawned_this_wave}/{self.enemies_in_wave}")
         
         # Note: Enemy end-reached logic moved to game.py for HOME animation integration
+
+    def start_first_wave(self):
+        """Initialize the first wave composition"""
+        if not hasattr(self, 'wave_composition') or not self.wave_composition:
+            self.prepare_wave_composition()
 
     def draw(self, surf):
         for e in self.enemies:

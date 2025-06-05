@@ -18,5 +18,15 @@ class Bullet(pygame.sprite.Sprite):
         self.pos += self.dir * self.speed * dt
         self.rect.topleft = self.pos
         if self.rect.colliderect(self.target.rect):
-            self.target.hit(self.damage)
+            # Check if target has dodge mechanism
+            if hasattr(self.target, 'hit') and callable(self.target.hit):
+                hit_result = self.target.hit(self.damage)
+                # For AdframeEnemy, hit() returns False if dodged, True if hit
+                # For other enemies, hit() doesn't return anything (None), so we treat it as hit
+                if hit_result is False:
+                    # Attack was dodged, bullet still disappears but no damage dealt
+                    pass
+            else:
+                # Fallback for enemies without dodge mechanism
+                self.target.hit(self.damage)
             self.kill()

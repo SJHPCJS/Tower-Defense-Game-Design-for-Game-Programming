@@ -3,13 +3,14 @@ import pygame
 import json
 import time
 import math  # Add math import
+import os
 from settings import *
 from menu import MainMenu, LevelSelector, show_level_creator_message
 from level_creator import run_level_creator
 from grid import GRID_MAP, update_grid_map
 from map_component import MapComponent
 from level import Level
-from tower import Tower
+from tower import TowerFactory
 from bullet import Bullet
 
 class Game:
@@ -86,6 +87,9 @@ class Game:
         # NOW call recalculate_path with the correct grid data
         level.recalculate_path()
         
+        # Initialize first wave composition
+        level.start_first_wave()
+        
         # Initialize MapComponent with the correct grid data
         game_map = MapComponent(grid=level.grid)
         
@@ -114,8 +118,10 @@ class Game:
         # Kill reward callback function
         def on_enemy_killed(enemy):
             nonlocal money
-            money += KILL_REWARD
-            print(f"Enemy killed! Reward: +${KILL_REWARD}")
+            # Use enemy-specific reward if available, otherwise use default KILL_REWARD
+            reward = getattr(enemy, 'reward', KILL_REWARD)
+            money += reward
+            print(f"{getattr(enemy, 'enemy_type', 'Enemy')} killed! Reward: +${reward}")
         
         # Set kill callback for level
         level.set_kill_callback(on_enemy_killed)
@@ -205,7 +211,7 @@ class Game:
                                     
                                     if can_build and money >= TOWER_COSTS[sel['name']]:
                                         money -= TOWER_COSTS[sel['name']]
-                                        towers.add(Tower(gx, gy, sel))
+                                        towers.add(TowerFactory.create_tower(sel, gx, gy))
                                         sel = None
 
             # Update game logic only if the game is not over
@@ -228,6 +234,9 @@ class Game:
                         # Trigger HOME hit animation before removing enemy
                         game_map.on_home_hit()
                         level.base_hp -= 1
+                        # Clean up speed modifiers
+                        if hasattr(e, 'cleanup_speed_modifiers'):
+                            e.cleanup_speed_modifiers()
                         e.kill()
                         print(f"Enemy reached HOME! Base HP: {level.base_hp}")
                     # Compatibility with old version enemy
@@ -235,6 +244,9 @@ class Game:
                         # Trigger HOME hit animation before removing enemy
                         game_map.on_home_hit()
                         level.base_hp -= getattr(e, 'damage_to_base', 1)
+                        # Clean up speed modifiers
+                        if hasattr(e, 'cleanup_speed_modifiers'):
+                            e.cleanup_speed_modifiers()
                         e.kill()
                         print(f"Enemy reached HOME! Base HP: {level.base_hp}")
                 
@@ -307,27 +319,47 @@ class Game:
         return "menu"
     
     def get_toolbar_layout(self, screen_w, screen_h):
-        """Get toolbar layout information for current screen size"""
-        toolbar_margin = 20
-        button_width = 90
-        button_height = 70
-        button_spacing = 10
+        """Get toolbar layout information for current screen size - vertical card style"""
+        toolbar_margin = 15
+        card_width = 120
+        card_height = 90
+        card_spacing = 10
         
-        # Create tower building buttons
+        # Calculate how many cards fit horizontally
+        available_width = screen_w - 350  # Leave space for info panel
+        cards_per_row = max(1, available_width // (card_width + card_spacing))
+        
+        # Create tower building buttons in card grid
         tower_buttons = []
         for i, tower_type in enumerate(TOWER_TYPES):
-            x = toolbar_margin + i * (button_width + button_spacing)
-            y = (UI_HEIGHT - button_height) // 2
-            button_rect = pygame.Rect(x, y, button_width, button_height)
-            tower_buttons.append({
-                'rect': button_rect,
-                'type': tower_type
-            })
+            row = i // cards_per_row
+            col = i % cards_per_row
+            
+            x = toolbar_margin + col * (card_width + card_spacing)
+            y = toolbar_margin + row * (card_height + card_spacing)
+            
+            # Make sure cards fit within UI_HEIGHT
+            if y + card_height <= UI_HEIGHT - toolbar_margin:
+                button_rect = pygame.Rect(x, y, card_width, card_height)
+                tower_buttons.append({
+                    'rect': button_rect,
+                    'type': tower_type
+                })
         
-        # Demolish button
-        demolish_x = toolbar_margin + len(TOWER_TYPES) * (button_width + button_spacing) + 30
+        # Demolish button - positioned at the end
+        last_tower_row = (len(TOWER_TYPES) - 1) // cards_per_row
+        last_tower_col = (len(TOWER_TYPES) - 1) % cards_per_row
+        
+        demolish_x = toolbar_margin + (last_tower_col + 1) * (card_width + card_spacing)
+        demolish_y = toolbar_margin + last_tower_row * (card_height + card_spacing)
+        
+        # If demolish button would go off screen, put it on next row
+        if demolish_x + card_width > available_width:
+            demolish_x = toolbar_margin
+            demolish_y += card_height + card_spacing
+        
         demolish_button = {
-            'rect': pygame.Rect(demolish_x, (UI_HEIGHT - button_height) // 2, button_width, button_height)
+            'rect': pygame.Rect(demolish_x, demolish_y, card_width, card_height)
         }
         
         return {
@@ -363,7 +395,7 @@ class Game:
         # Get layout information
         layout = self.get_toolbar_layout(screen_w, screen_h)
         
-        # Enhanced tower building buttons
+        # Enhanced tower building buttons - Card Style
         mx, my = pygame.mouse.get_pos()
         
         for button_info in layout['tower_buttons']:
@@ -375,120 +407,149 @@ class Game:
             can_afford = money >= TOWER_COSTS[tower_type['name']]
             is_hovered = rect.collidepoint(mx, my) and my < UI_HEIGHT
             
-            # Enhanced button appearance
+            # Enhanced card appearance
             if is_selected:
-                bg_color = (80, 120, 160, 200)  # Rich blue selection
-                glow_color = (120, 180, 255, 100)
+                bg_color = (80, 120, 160, 220)  # Rich blue selection
+                glow_color = (120, 180, 255, 120)
+                border_color = (150, 200, 255)
             elif not can_afford:
                 bg_color = (40, 40, 50, 180)    # Dark disabled
                 glow_color = None
+                border_color = (80, 80, 90)
             elif is_hovered:
                 bg_color = (60, 90, 120, 200)   # Medium blue hover
-                glow_color = (100, 150, 200, 80)
+                glow_color = (100, 150, 200, 100)
+                border_color = (120, 170, 220)
             else:
                 bg_color = (45, 60, 75, 180)    # Default blue-gray
                 glow_color = None
+                border_color = (90, 120, 150)
             
-            # Button glow effect
+            # Card glow effect
             if glow_color:
-                for i in range(6, 0, -1):
-                    glow_alpha = glow_color[3] * (i / 6) // 3
+                for i in range(8, 0, -1):
+                    glow_alpha = glow_color[3] * (i / 8) // 4
                     glow_rect = pygame.Rect(rect.x - i, rect.y - i, rect.width + i*2, rect.height + i*2)
                     glow_surface = pygame.Surface((glow_rect.width, glow_rect.height), pygame.SRCALPHA)
                     glow_surface.fill((*glow_color[:3], glow_alpha))
                     screen.blit(glow_surface, (glow_rect.x, glow_rect.y))
             
-            # Draw enhanced button
-            button_surface = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
-            button_surface.fill(bg_color)
-            screen.blit(button_surface, (rect.x, rect.y))
+            # Draw enhanced card with rounded corners
+            card_surface = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
             
-            # Enhanced border
-            border_color = tower_type['color'] if can_afford else (80, 80, 90)
-            border_thickness = 3 if is_selected else 2
-            pygame.draw.rect(screen, border_color, rect, border_thickness, border_radius=10)
+            # Create rounded rectangle effect
+            for i in range(rect.height):
+                progress = i / rect.height
+                alpha = bg_color[3] + int(20 * math.sin(progress * math.pi))
+                alpha = min(255, max(0, alpha))
+                line_color = (*bg_color[:3], alpha)
+                pygame.draw.line(card_surface, line_color, (5, i), (rect.width - 5, i))
+            
+            screen.blit(card_surface, (rect.x, rect.y))
+            
+            # Enhanced border with rounded corners
+            pygame.draw.rect(screen, border_color, rect, 3, border_radius=12)
             
             # Tower icon with enhanced effects
             center_x = rect.centerx
-            icon_y = rect.y + 22
+            icon_y = rect.y + 25
             
-            # Icon glow for selected/hovered
+            # Icon background circle
+            icon_bg_color = tower_type['color'] if can_afford else (80, 80, 90)
             if is_selected or is_hovered:
-                for radius in range(16, 12, -1):
-                    glow_alpha = 30 if is_selected else 20
-                    pygame.draw.circle(screen, (*tower_type['color'], glow_alpha), (center_x, icon_y), radius)
+                for radius in range(18, 14, -1):
+                    glow_alpha = 40 if is_selected else 25
+                    pygame.draw.circle(screen, (*icon_bg_color, glow_alpha), (center_x, icon_y), radius)
             
-            # Main icon
-            pygame.draw.circle(screen, tower_type['color'], (center_x, icon_y), 12)
-            pygame.draw.circle(screen, WHITE, (center_x, icon_y), 12, 2)
+            # Main icon circle
+            pygame.draw.circle(screen, icon_bg_color, (center_x, icon_y), 14)
+            pygame.draw.circle(screen, WHITE if can_afford else (120, 120, 130), (center_x, icon_y), 14, 2)
             
-            # Enhanced text with shadows
+            # Tower name with enhanced styling
             name_color = WHITE if can_afford else (120, 120, 130)
             name_text = FONTS['small'].render(tower_type['name'], True, (0, 0, 0))
-            screen.blit(name_text, (center_x - name_text.get_width()//2 + 1, icon_y + 26))
+            screen.blit(name_text, (center_x - name_text.get_width()//2 + 1, icon_y + 22))
             name_text = FONTS['small'].render(tower_type['name'], True, name_color)
-            screen.blit(name_text, (center_x - name_text.get_width()//2, icon_y + 25))
+            screen.blit(name_text, (center_x - name_text.get_width()//2, icon_y + 21))
             
             # Enhanced price display
             cost_color = (100, 255, 150) if can_afford else (255, 120, 120)
-            cost_text = FONTS['tiny'].render(f"${TOWER_COSTS[tower_type['name']]}", True, (0, 0, 0))
-            screen.blit(cost_text, (center_x - cost_text.get_width()//2 + 1, icon_y + 42))
-            cost_text = FONTS['tiny'].render(f"${TOWER_COSTS[tower_type['name']]}", True, cost_color)
-            screen.blit(cost_text, (center_x - cost_text.get_width()//2, icon_y + 41))
+            cost_text = FONTS['small'].render(f"${TOWER_COSTS[tower_type['name']]}", True, (0, 0, 0))
+            screen.blit(cost_text, (center_x - cost_text.get_width()//2 + 1, icon_y + 38))
+            cost_text = FONTS['small'].render(f"${TOWER_COSTS[tower_type['name']]}", True, cost_color)
+            screen.blit(cost_text, (center_x - cost_text.get_width()//2, icon_y + 37))
+            
+            # Tower description (smaller text)
+            desc_color = (200, 200, 210) if can_afford else (100, 100, 110)
+            desc_text = tower_type.get('description', '')
+            if len(desc_text) > 15:  # Truncate long descriptions
+                desc_text = desc_text[:12] + "..."
+            desc_surface = FONTS['tiny'].render(desc_text, True, desc_color)
+            desc_x = center_x - desc_surface.get_width() // 2
+            desc_y = rect.y + rect.height - 15
+            screen.blit(desc_surface, (desc_x, desc_y))
         
-        # Enhanced demolish button
+        # Enhanced demolish button - Card Style
         demolish_rect = layout['demolish_button']['rect']
         is_demolish_active = selected_tower == "demolish_mode"
         is_demolish_hovered = demolish_rect.collidepoint(mx, my) and my < UI_HEIGHT
         
         if is_demolish_active:
-            bg_color = (160, 80, 80, 200)   # Red active
-            glow_color = (255, 120, 120, 100)
+            bg_color = (160, 80, 80, 220)   # Red active
+            glow_color = (255, 120, 120, 120)
+            border_color = (255, 150, 150)
         elif is_demolish_hovered:
             bg_color = (120, 60, 60, 200)   # Dark red hover
-            glow_color = (200, 100, 100, 80)
+            glow_color = (200, 100, 100, 100)
+            border_color = (200, 120, 120)
         else:
             bg_color = (80, 45, 45, 180)    # Dark red default
             glow_color = None
+            border_color = (120, 80, 80)
         
-        # Demolish button glow
+        # Demolish card glow
         if glow_color:
-            for i in range(6, 0, -1):
-                glow_alpha = glow_color[3] * (i / 6) // 3
+            for i in range(8, 0, -1):
+                glow_alpha = glow_color[3] * (i / 8) // 4
                 glow_rect = pygame.Rect(demolish_rect.x - i, demolish_rect.y - i, 
                                       demolish_rect.width + i*2, demolish_rect.height + i*2)
                 glow_surface = pygame.Surface((glow_rect.width, glow_rect.height), pygame.SRCALPHA)
                 glow_surface.fill((*glow_color[:3], glow_alpha))
                 screen.blit(glow_surface, (glow_rect.x, glow_rect.y))
         
-        # Draw demolish button
+        # Draw demolish card
         demolish_surface = pygame.Surface((demolish_rect.width, demolish_rect.height), pygame.SRCALPHA)
-        demolish_surface.fill(bg_color)
-        screen.blit(demolish_surface, (demolish_rect.x, demolish_rect.y))
+        for i in range(demolish_rect.height):
+            progress = i / demolish_rect.height
+            alpha = bg_color[3] + int(20 * math.sin(progress * math.pi))
+            alpha = min(255, max(0, alpha))
+            line_color = (*bg_color[:3], alpha)
+            pygame.draw.line(demolish_surface, line_color, (5, i), (demolish_rect.width - 5, i))
         
-        pygame.draw.rect(screen, (200, 100, 100), demolish_rect, 3, border_radius=10)
+        screen.blit(demolish_surface, (demolish_rect.x, demolish_rect.y))
+        pygame.draw.rect(screen, border_color, demolish_rect, 3, border_radius=12)
         
         # Enhanced demolish icon
         center_x, center_y = demolish_rect.center
-        icon_y = demolish_rect.y + 22
+        icon_y = demolish_rect.y + 25
         
         # Hammer icon with glow
         if is_demolish_active:
-            pygame.draw.circle(screen, (255, 150, 150, 50), (center_x, icon_y), 15)
+            pygame.draw.circle(screen, (255, 150, 150, 50), (center_x, icon_y), 17)
         
-        pygame.draw.circle(screen, (220, 100, 100), (center_x, icon_y), 8)
-        pygame.draw.rect(screen, (180, 80, 80), (center_x - 2, icon_y, 4, 18))
+        pygame.draw.circle(screen, (220, 100, 100), (center_x, icon_y), 10)
+        pygame.draw.rect(screen, (180, 80, 80), (center_x - 2, icon_y, 4, 20))
         
         # Enhanced demolish text
         demolish_text = FONTS['small'].render("Demolish", True, (0, 0, 0))
-        screen.blit(demolish_text, (center_x - demolish_text.get_width()//2 + 1, icon_y + 26))
+        screen.blit(demolish_text, (center_x - demolish_text.get_width()//2 + 1, icon_y + 22))
         demolish_text = FONTS['small'].render("Demolish", True, WHITE)
-        screen.blit(demolish_text, (center_x - demolish_text.get_width()//2, icon_y + 25))
+        screen.blit(demolish_text, (center_x - demolish_text.get_width()//2, icon_y + 21))
         
         refund_text = FONTS['tiny'].render("50% refund", True, (0, 0, 0))
-        screen.blit(refund_text, (center_x - refund_text.get_width()//2 + 1, icon_y + 42))
+        screen.blit(refund_text, (center_x - refund_text.get_width()//2 + 1, demolish_rect.y + demolish_rect.height - 14))
         refund_text = FONTS['tiny'].render("50% refund", True, (255, 200, 120))
-        screen.blit(refund_text, (center_x - refund_text.get_width()//2, icon_y + 41))
+        screen.blit(refund_text, (center_x - refund_text.get_width()//2, demolish_rect.y + demolish_rect.height - 15))
         
         # Enhanced game info panel
         info_panel_x = screen_w - 320
