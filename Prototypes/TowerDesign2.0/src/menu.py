@@ -48,9 +48,10 @@ class MainMenu:
         button_width, button_height = 250, 60
         button_x = DEFAULT_SCREEN_W // 2 - button_width // 2
         
-        self.start_button = Button(button_x, DEFAULT_SCREEN_H // 2 - 30, button_width, button_height, "Start Game")
+        self.start_button = Button(button_x, DEFAULT_SCREEN_H // 2 - 70, button_width, button_height, "Start Game")
+        self.library_button = Button(button_x, DEFAULT_SCREEN_H // 2 - 10, button_width, button_height, "Character Library", color=UI_ACCENT, hover_color=(100, 150, 200))
         self.create_button = Button(button_x, DEFAULT_SCREEN_H // 2 + 50, button_width, button_height, "Create a Level")
-        self.quit_button = Button(button_x, DEFAULT_SCREEN_H // 2 + 130, button_width, button_height, "Quit", color=BROWN, hover_color=RED)
+        self.quit_button = Button(button_x, DEFAULT_SCREEN_H // 2 + 110, button_width, button_height, "Quit", color=BROWN, hover_color=RED)
         
     def draw_background(self, screen):
         screen_w, screen_h = screen.get_size()
@@ -80,6 +81,8 @@ class MainMenu:
                 
                 if self.start_button.handle_event(event):
                     return "start"
+                if self.library_button.handle_event(event):
+                    return "library"
                 if self.create_button.handle_event(event):
                     return "creator"
                 if self.quit_button.handle_event(event):
@@ -94,9 +97,10 @@ class MainMenu:
             button_x = screen_w // 2 - button_width // 2
             center_y = screen_h // 2
             
-            self.start_button.rect = pygame.Rect(button_x, center_y - 30, button_width, button_height)
+            self.start_button.rect = pygame.Rect(button_x, center_y - 70, button_width, button_height)
+            self.library_button.rect = pygame.Rect(button_x, center_y - 10, button_width, button_height)
             self.create_button.rect = pygame.Rect(button_x, center_y + 50, button_width, button_height)
-            self.quit_button.rect = pygame.Rect(button_x, center_y + 130, button_width, button_height)
+            self.quit_button.rect = pygame.Rect(button_x, center_y + 110, button_width, button_height)
             
             self.draw_background(current_screen)
             
@@ -116,6 +120,7 @@ class MainMenu:
             
             # Draw buttons
             self.start_button.draw(current_screen)
+            self.library_button.draw(current_screen)
             self.create_button.draw(current_screen)
             self.quit_button.draw(current_screen)
             
