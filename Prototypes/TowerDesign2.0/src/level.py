@@ -25,6 +25,12 @@ class Level:
         self.wave_break_duration = 8.0  # Increased from 5.0 to 8.0 seconds for more building time
         self.in_wave_break = False
         
+        # Preparation time system
+        self.preparation_time = 10.0  # 10 seconds preparation time
+        self.preparation_timer = 0.0
+        self.in_preparation = True  # Start with preparation time
+        self.first_wave_started = False
+        
         # Enemy wave composition
         self.wave_composition = {}
         self.current_enemy_queue = []
@@ -133,6 +139,14 @@ class Level:
         # Update enemies
         self.enemies.update(dt)
         
+        # Handle preparation time before first wave
+        if self.in_preparation and not self.first_wave_started:
+            self.preparation_timer += dt
+            if self.preparation_timer >= self.preparation_time:
+                self.in_preparation = False
+                self.first_wave_started = True
+                print(f"Preparation time complete! Wave {self.current_wave} starting!")
+        
         # Count living enemies (not dead or reached end)
         living_enemies = [e for e in self.enemies if hasattr(e, 'health') and e.health > 0]
         
@@ -168,8 +182,9 @@ class Level:
                 
                 print(f"Wave {self.current_wave} starting! {self.enemies_in_wave} enemies, {self.delay:.2f}s delay")
         
-        # Spawn enemies if not in wave break and haven't spawned all enemies for this wave
-        if not self.in_wave_break and self.enemies_spawned_this_wave < self.enemies_in_wave and not self.all_waves_complete:
+        # Spawn enemies if not in wave break, not in preparation, and haven't spawned all enemies for this wave
+        if (not self.in_wave_break and not self.in_preparation and 
+            self.enemies_spawned_this_wave < self.enemies_in_wave and not self.all_waves_complete):
             self.timer += dt
             if self.timer >= self.delay:
                 self.timer -= self.delay
@@ -186,13 +201,13 @@ class Level:
                             # Calculate path for this specific enemy
                             path = a_star(self.start, self.end, self.grid)
                             if path:
-                                enemy = EnemyFactory.create_enemy(enemy_type, path)
+                                enemy = EnemyFactory.create_enemy(enemy_type, path, None, self.current_wave)
                             else:
                                 print(f"Failed to create path for {enemy_type}, skipping")
                                 return
                         else:
                             # Use global grid
-                            enemy = EnemyFactory.create_enemy(enemy_type, self.start, self.end)
+                            enemy = EnemyFactory.create_enemy(enemy_type, self.start, self.end, self.current_wave)
                         
                         # Apply level-specific enemy speed scaling (if different from default)
                         if self.enemy_speed != 50:  # Only apply if different from default base speed

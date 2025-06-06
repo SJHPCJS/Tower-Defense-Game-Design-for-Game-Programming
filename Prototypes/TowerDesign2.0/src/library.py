@@ -203,30 +203,90 @@ class CharacterLibrary:
         self.load_character_animator()
     
     def init_cards(self):
-        """初始化卡片 - 更大尺寸，不压缩"""
+        """初始化卡片 - 自适应界面尺寸"""
         self.cards = []
-        card_width, card_height = 140, 110  # 更大的卡片
-        margin = 25
-        start_x = 50
+        
+        # 获取当前屏幕尺寸
+        screen_w, screen_h = pygame.display.get_surface().get_size()
+        
+        # 计算总卡片数量：1个HOME + 5个防御塔 + 5个敌人 = 11个卡片
+        total_cards = 1 + len(TOWERS) + len(ENEMIES)
+        
+        # 自适应卡片尺寸和间距
+        toolbar_margin = 100  # 工具栏左右边距
+        available_width = screen_w - toolbar_margin * 2
+        
+        # 基础卡片尺寸
+        base_card_width = 140
+        base_card_height = 110
+        min_card_width = 100
+        min_card_height = 80
+        
+        # 计算每个卡片组之间的分组间距
+        group_spacing = 50  # HOME和塔之间，塔和敌人之间的额外间距
+        
+        # 计算理想的卡片宽度和间距
+        # 总需要宽度 = 卡片宽度 * 卡片数量 + 普通间距 * (卡片数量-1) + 分组间距 * 2
+        ideal_card_spacing = 25
+        
+        # 尝试使用基础尺寸
+        total_width_needed = (base_card_width * total_cards + 
+                            ideal_card_spacing * (total_cards - 1) + 
+                            group_spacing * 2)
+        
+        if total_width_needed <= available_width:
+            # 屏幕足够宽，使用基础尺寸
+            card_width = base_card_width
+            card_height = base_card_height
+            card_spacing = ideal_card_spacing
+        else:
+            # 屏幕较窄，需要调整尺寸
+            # 首先尝试缩小间距
+            min_spacing = 15
+            total_width_with_min_spacing = (base_card_width * total_cards + 
+                                          min_spacing * (total_cards - 1) + 
+                                          group_spacing * 2)
+            
+            if total_width_with_min_spacing <= available_width:
+                # 缩小间距后能装下
+                card_width = base_card_width
+                card_height = base_card_height
+                card_spacing = min_spacing
+            else:
+                # 需要缩小卡片尺寸
+                card_spacing = min_spacing
+                remaining_width = available_width - (card_spacing * (total_cards - 1) + group_spacing * 2)
+                card_width = max(min_card_width, remaining_width // total_cards)
+                card_height = max(min_card_height, int(card_width * base_card_height / base_card_width))
+        
+        # 计算起始位置（居中）
+        actual_total_width = (card_width * total_cards + 
+                            card_spacing * (total_cards - 1) + 
+                            group_spacing * 2)
+        start_x = (screen_w - actual_total_width) // 2
         start_y = 30  # 工具栏位置
         
+        current_x = start_x
+        
         # HOME卡片
-        home_rect = pygame.Rect(start_x, start_y, card_width, card_height)
+        home_rect = pygame.Rect(current_x, start_y, card_width, card_height)
         self.cards.append(LibraryCard("HOME", home_rect, "home"))
+        current_x += card_width + card_spacing + group_spacing
         
         # 防御塔卡片
-        tower_start_x = start_x + card_width + margin * 2
         for i, tower_name in enumerate(TOWERS):
-            x = tower_start_x + i * (card_width + margin)
-            rect = pygame.Rect(x, start_y, card_width, card_height)
+            rect = pygame.Rect(current_x, start_y, card_width, card_height)
             self.cards.append(LibraryCard(tower_name, rect))
+            current_x += card_width + card_spacing
+        
+        # 敌人卡片前添加分组间距
+        current_x += group_spacing - card_spacing
         
         # 敌人卡片
-        enemy_start_x = tower_start_x + len(TOWERS) * (card_width + margin) + margin * 2
         for i, enemy_name in enumerate(ENEMIES):
-            x = enemy_start_x + i * (card_width + margin)
-            rect = pygame.Rect(x, start_y, card_width, card_height)
+            rect = pygame.Rect(current_x, start_y, card_width, card_height)
             self.cards.append(LibraryCard(enemy_name, rect))
+            current_x += card_width + card_spacing
     
     def load_character_animator(self):
         """加载角色动画"""

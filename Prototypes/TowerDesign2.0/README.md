@@ -1,97 +1,131 @@
-# Forest Guard - Tower Defense Game
+# Tower Defense Game 2.0
 
-A modern tower defense game built with Pygame featuring adaptive UI, level creation tools, and strategic gameplay.
+A tower defense game with comprehensive bullet system, special effects, and adaptive UI.
 
-## Features
+## Key Features
 
-### Game Features
-- **Adaptive UI**: Resizable window with minimum size constraints (800x600)
-- **Fullscreen Support**: Toggle with F11 key
-- **Economic System**: Starting money ($100), tower costs, and kill rewards
-- **Tower Types**: 
-  - Fast Tower ($20): High attack speed, low damage
-  - Strong Tower ($40): High damage, slow attack speed  
-  - Balanced Tower ($30): Moderate damage and speed
-- **Demolish System**: Remove towers for 50% refund
-- **Dynamic Scaling**: All game elements scale with window size
+### Adaptive UI System
+- **Adaptive Library Toolbar**: Automatically adjusts card spacing and sizes based on screen resolution
+  - Optimal spacing on wide screens (1920px+)
+  - Compressed spacing on medium screens (1024-1366px)
+  - Scaled-down cards on narrow screens (<1024px)
+  - Real-time window resize support
+  - Maintains visual balance across all screen sizes
 
-### Level Creator
-- **Visual Editor**: Place and remove path tiles
-- **AI Generation**: Automated level creation with path optimization
-- **Save/Load**: JSON-based level storage
-- **Path Validation**: Ensures valid paths from spawn to home
+### Advanced Bullet System
+- **Design Patterns**: Strategy and Factory patterns for bullet behavior
+- **Special Effects**: 
+  - Emberwing: Burn damage (5 damage/sec for 3 seconds) with red "Fire" text
+  - Volt Cow: Electric chain damage (50% to nearby enemies) with yellow "Zap" text
+  - Other towers: Normal damage with white "Miss" text
+- **Visual Enhancements**: 
+  - Bullet rotation animation (360°/second)
+  - Large 40x40 bullet sprites with proper scaling
+  - Text effects sized at 32px for visibility
 
-### Technical Features
-- **Pathfinding**: A* algorithm for enemy navigation
-- **Sprite Management**: Efficient tower, bullet, and enemy handling
-- **Modern UI**: Dark theme with hover effects and visual feedback
-- **Encoding Support**: Full UTF-8 support for level names
+### Game Flow Improvements
+- **Preparation Time**: 10-second countdown before first wave with Chinese/English text support
+- **Unified Forest Guard Theme**: Consistent green/brown color scheme across all interfaces
+- **Enhanced Text Effects**: Properly sized and visible damage/miss indicators
 
-## How to Run
+### UI Enhancements
+- **Level Creator**: Forest Guard themed interface with wood textures and shadows
+- **Library System**: Character gallery with adaptive card layout
+- **ESC Key Bindings**: Return to menu from library and level creator
+
+## Technical Implementation
+
+### Adaptive Library System
+```python
+# Automatically calculates optimal card layout based on screen width
+def init_cards(self):
+    screen_w, screen_h = pygame.display.get_surface().get_size()
+    total_cards = 1 + len(TOWERS) + len(ENEMIES)  # 11 cards total
+    
+    # Adaptive sizing algorithm:
+    # 1. Try base size (140x110) with ideal spacing (25px)
+    # 2. Reduce spacing to minimum (15px) if needed
+    # 3. Scale down cards proportionally if still too wide
+    # 4. Center the entire toolbar on screen
+```
+
+### Bullet Strategy Pattern
+```python
+class BulletStrategy:
+    def create_bullet(self, start_pos, target_pos, tower_name):
+        # Factory method creates appropriate bullet type
+        
+class FireBulletStrategy(BulletStrategy):
+    def apply_damage(self, enemy, enemies_group):
+        # Apply burn effect: 5 damage/sec for 3 seconds
+        
+class ElectricBulletStrategy(BulletStrategy):
+    def apply_damage(self, enemy, enemies_group):
+        # Chain to nearby enemies within 40px for 50% damage
+```
+
+## File Structure
+
+```
+Prototypes/TowerDesign2.0/
+├── src/
+│   ├── bullets.py          # Bullet system with strategy pattern
+│   ├── game.py            # Main game with preparation time
+│   ├── library.py         # Adaptive character library
+│   ├── level_creator.py   # Forest-themed level creator
+│   ├── main.py           # Updated main menu
+│   └── ...
+├── test_adaptive_library.py    # Adaptive UI demonstration
+├── test_preparation_time.py    # Preparation time test
+├── test_all_improvements.py    # Comprehensive feature test
+└── README.md
+```
+
+## Testing
+
+### Adaptive Library Test
+```bash
+python test_adaptive_library.py
+```
+- Press SPACE to cycle through different screen resolutions
+- Drag window edges to test real-time resizing
+- Observe automatic card spacing and size adjustments
+
+### Preparation Time Test
+```bash
+python test_preparation_time.py
+```
+- Shows 10-second countdown before first wave
+- Displays timing in wave panel
+
+### Comprehensive Test
+```bash
+python test_all_improvements.py
+```
+- Tests all features: bullets, effects, preparation time, and adaptive UI
+
+## Screen Size Support
+
+| Resolution | Card Size | Spacing | Behavior |
+|------------|-----------|---------|-----------|
+| 2560x1440+ | 140x110 | 25px | Optimal layout with generous spacing |
+| 1920x1080 | 140x110 | 25px | Standard layout |
+| 1366x768 | 140x110 | 15px | Compressed spacing |
+| 1024x768 | 120x96 | 15px | Scaled down cards |
+| 800x600 | 100x80 | 15px | Minimum card size |
+
+The adaptive system ensures the library toolbar remains functional and visually appealing across all supported screen sizes, automatically adjusting layout parameters without requiring manual configuration.
+
+## Running the Game
 
 ```bash
-cd Prototypes/TowerDesign2.0
 python run_game.py
 ```
 
-## Controls
+Navigate through the menus to access:
+- **PLAY**: Start the game with preparation time
+- **LIBRARY**: View adaptive character gallery
+- **LEVEL CREATOR**: Create custom levels with Forest Guard theme
+- **QUIT**: Exit the game
 
-- **ESC**: Return to menu / Exit
-- **F11**: Toggle fullscreen
-- **Mouse**: Click to place towers, interact with UI
-- **Level Creator**: 
-  - Click tools to select
-  - Click grid to place/remove paths
-  - Enter to save level
-
-## Project Structure
-
-```
-TowerDesign2.0/
-├── src/                 # Source code
-│   ├── game.py         # Main game logic
-│   ├── menu.py         # Menu system
-│   ├── level_creator.py # Level creation tool
-│   ├── level.py        # Level management
-│   ├── tower.py        # Tower mechanics
-│   ├── enemy.py        # Enemy behavior
-│   ├── bullet.py       # Projectile system
-│   ├── pathfinding.py  # A* pathfinding
-│   ├── grid.py         # Grid management
-│   ├── map_component.py # Map rendering
-│   └── settings.py     # Game configuration
-├── levels/             # Level files (JSON)
-├── assets/             # Game assets
-└── run_game.py         # Entry point
-```
-
-## Game Mechanics
-
-### Economy
-- Start with $100
-- Towers cost $20-40 depending on type
-- Earn $1 per enemy defeated
-- Demolish towers for 50% refund
-
-### Tower Placement
-- Only on grass tiles (green)
-- Cannot place on paths (brown)
-- Cannot place on spawn/home points
-
-### Enemy Behavior
-- Follow optimal paths using A* pathfinding
-- Scale with window size for consistent gameplay
-- Deal damage to base when reaching home
-
-### Level Design
-- Spawn point: Usually top-left
-- Home point: Automatically calculated as farthest path point from spawn
-- Path validation ensures playable levels
-
-## Recent Updates
-
-- Removed all backup files for cleaner project structure
-- Fixed Chinese comments and encoding issues
-- Removed fullscreen hints from UI
-- Updated level creator to use proper end point calculation
-- Ensured consistent spawn/home positioning across all levels 
+All interfaces support ESC key to return to the main menu. 

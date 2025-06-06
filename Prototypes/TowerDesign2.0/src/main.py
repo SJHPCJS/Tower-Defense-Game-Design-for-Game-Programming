@@ -54,10 +54,11 @@ def main():
         screen.blit(hp,(SCREEN_W-120,UI_HEIGHT//2-hp.get_height()//2))
 
         game_map.draw(screen)
-        level.draw(screen)
         for tower in towers:
             tower.draw(screen)
         bullets.draw(screen)
+        # Draw enemies last to appear on top of everything (including toolbar)
+        level.draw(screen)
         pygame.display.flip()
 
     pygame.quit(); sys.exit()

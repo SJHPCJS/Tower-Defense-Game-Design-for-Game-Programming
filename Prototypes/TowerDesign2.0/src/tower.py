@@ -2,7 +2,7 @@ import pygame
 import os
 import math
 from settings import *
-from bullet import Bullet
+from bullet import BulletFactory
 
 class TowerSprite:
     """Handles tower sprite loading and animation"""
@@ -225,7 +225,8 @@ class AttackingTower(BaseTower):
         nearest = min(enemies,
                       key=lambda e:(cx-e.rect.centerx)**2+(cy-e.rect.centery)**2)
         if (cx-nearest.rect.centerx)**2 + (cy-nearest.rect.centery)**2 <= scaled_range**2:
-            bullets.add(Bullet(self.rect.center, nearest, self.damage))
+            bullet = BulletFactory.create_bullet(self.name, self.rect.center, nearest, self.damage, enemies)
+            bullets.add(bullet)
             self.cool = self.rof
             self.start_attack_animation()
 

@@ -149,7 +149,7 @@ class MissEffect:
     def __init__(self, pos):
         self.pos = pos
         self.timer = 1.0  # Show for 1 second
-        self.font = pygame.font.SysFont('Arial', 16, bold=True)
+        self.font = pygame.font.SysFont('Arial', 32, bold=True)  # 2x larger (16 -> 32)
         self.text = self.font.render("MISS", True, (255, 255, 0))
         self.offset_y = 0
     
@@ -163,7 +163,9 @@ class MissEffect:
             alpha = min(255, int(self.timer * 255))
             text_surface = self.text.copy()
             text_surface.set_alpha(alpha)
-            pos = (self.pos[0] - 15, self.pos[1] - 20 - self.offset_y)
+            # Adjust position for larger text
+            text_rect = text_surface.get_rect()
+            pos = (self.pos[0] - text_rect.width//2, self.pos[1] - 30 - self.offset_y)
             screen.blit(text_surface, pos)
 
 class BaseEnemy(pygame.sprite.Sprite):
@@ -231,6 +233,10 @@ class BaseEnemy(pygame.sprite.Sprite):
         
         # Miss effects
         self.miss_effects = []
+        
+        # Special effects
+        self.burn_effects = []
+        self.electric_effects = []
 
     def get_scaled_image(self):
         """Get current frame scaled to appropriate size"""
@@ -352,6 +358,12 @@ class BaseEnemy(pygame.sprite.Sprite):
         # Update miss effects
         self.miss_effects = [effect for effect in self.miss_effects if effect.update(dt)]
         
+        # Update burn effects
+        self.burn_effects = [effect for effect in self.burn_effects if effect.update(dt, self)]
+        
+        # Update electric effects
+        self.electric_effects = [effect for effect in self.electric_effects if effect.update(dt)]
+        
         # Movement logic
         if self.step < len(self.path):
             if self.step + 1 < len(self.path):
@@ -418,6 +430,14 @@ class BaseEnemy(pygame.sprite.Sprite):
         
         # Draw miss effects
         for effect in self.miss_effects:
+            effect.draw(surf)
+        
+        # Draw burn effects
+        for effect in self.burn_effects:
+            effect.draw(surf)
+        
+        # Draw electric effects
+        for effect in self.electric_effects:
             effect.draw(surf)
 
 class AdframeEnemy(BaseEnemy):
@@ -497,14 +517,26 @@ class EnemyFactory:
     """Factory class for creating different enemy types"""
     
     @staticmethod
-    def create_enemy(enemy_type, path_or_start, end=None):
-        """Create an enemy based on type"""
+    def create_enemy(enemy_type, path_or_start, end=None, wave_number=1):
+        """Create an enemy based on type with health scaling based on wave number"""
         if enemy_type == 'Adframe':
-            return AdframeEnemy(path_or_start, end)
+            enemy = AdframeEnemy(path_or_start, end)
         elif enemy_type == 'Wiregeist':
-            return WiregeistEnemy(path_or_start, end)
+            enemy = WiregeistEnemy(path_or_start, end)
         else:
-            return BaseEnemy(path_or_start, end, enemy_type)
+            enemy = BaseEnemy(path_or_start, end, enemy_type)
+        
+        # Apply wave health scaling (10% increase per wave)
+        health_multiplier = 1.0 + (wave_number - 1) * 0.1
+        if wave_number > 1:
+            enemy.max_health = int(enemy.max_health * health_multiplier)
+            enemy.health = enemy.max_health
+        
+        # Debug print for enemy health (for all waves)
+        print(f"Wave {wave_number}: {enemy_type} - Base Health: {ENEMY_TYPES[enemy_type]['health']}, "
+              f"Scaled Health: {enemy.health} (multiplier: {health_multiplier:.1f})")
+        
+        return enemy
     
     @staticmethod
     def get_wave_composition(wave_number, total_enemies):

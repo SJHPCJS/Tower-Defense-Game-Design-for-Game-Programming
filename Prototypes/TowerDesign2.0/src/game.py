@@ -338,9 +338,6 @@ class Game:
             # Draw map
             game_map.draw(current_screen)
             
-            # Draw level
-            level.draw(current_screen)
-            
             # Draw towers
             for tower in towers:
                 tower.draw(current_screen)
@@ -354,6 +351,9 @@ class Game:
             
             # Draw wave panel with updated format
             self.draw_wave_panel_with_timing(current_screen, current_screen_size, level, current_game_time)
+            
+            # Draw enemies and their effects LAST to appear on top of everything (including toolbar)
+            level.draw(current_screen)
             
             # Draw wave completion message if active
             if wave_message:
@@ -654,7 +654,12 @@ class Game:
         screen.blit(wave_title, (wave_panel_x + 10, wave_panel_y + 5))
         
         # Wave progress
-        if level.in_wave_break:
+        if level.in_preparation and not level.first_wave_started:
+            # Show preparation countdown
+            time_left = level.preparation_time - level.preparation_timer
+            countdown_text = FONTS['small'].render(f"First wave in: {time_left:.1f}s", True, (255, 100, 100))
+            screen.blit(countdown_text, (wave_panel_x + 10, wave_panel_y + 30))
+        elif level.in_wave_break:
             # Show countdown during wave break
             time_left = level.wave_break_duration - level.wave_break_timer
             countdown_text = FONTS['small'].render(f"Next wave in: {time_left:.1f}s", True, UI_WARNING)
@@ -811,7 +816,12 @@ class Game:
         time_text = f"Time: {current_game_time:.1f}s"
         
         # Status text
-        if level.in_wave_break and not level.all_waves_complete:
+        if level.in_preparation and not level.first_wave_started:
+            # Show preparation countdown
+            time_left = level.preparation_time - level.preparation_timer
+            status_text = f"First wave in: {time_left:.1f}s"
+            status_color = (255, 100, 100)  # Red color for preparation countdown
+        elif level.in_wave_break and not level.all_waves_complete:
             time_left = level.wave_break_duration - level.wave_break_timer
             status_text = f"Next wave in: {time_left:.1f}s"
             status_color = (255, 220, 100)

@@ -51,13 +51,13 @@ class LevelCreator:
         }
         self.active_input_field = None
         
-        # Tools definition with modern UI colors
+        # Tools definition with Forest Guard theme colors
         self.tools = [
-            {'id': 'place_path', 'name': 'Place Path', 'icon': 'PATH', 'color': UI_SUCCESS, 'hover': (60, 200, 120)},
-            {'id': 'delete_path', 'name': 'Delete Path', 'icon': 'DEL', 'color': UI_DANGER, 'hover': (240, 80, 90)},
-            {'id': 'reset_map', 'name': 'Reset Map', 'icon': 'RESET', 'color': UI_WARNING, 'hover': (255, 210, 30)},
-            {'id': 'ai_generate', 'name': 'AI Generate', 'icon': 'AI', 'color': UI_ACCENT, 'hover': (90, 150, 200)},
-            {'id': 'save_level', 'name': 'Save Level', 'icon': 'SAVE', 'color': (100, 100, 255), 'hover': (130, 130, 255)}
+            {'id': 'place_path', 'name': 'Place Path', 'icon': 'PATH', 'color': FOREST_GREEN, 'hover': LIGHT_GREEN},
+            {'id': 'delete_path', 'name': 'Delete Path', 'icon': 'DEL', 'color': BROWN, 'hover': RED},
+            {'id': 'reset_map', 'name': 'Reset Map', 'icon': 'RESET', 'color': GOLD, 'hover': YELLOW},
+            {'id': 'ai_generate', 'name': 'AI Generate', 'icon': 'AI', 'color': DARK_GREEN, 'hover': FOREST_GREEN},
+            {'id': 'save_level', 'name': 'Save Level', 'icon': 'SAVE', 'color': UI_ACCENT, 'hover': (100, 150, 200)}
         ]
         
     def _load_tile_images(self):
@@ -522,8 +522,13 @@ class LevelCreator:
         current_screen = pygame.display.get_surface()
         screen_w, screen_h = current_screen.get_size()
         
-        # Clear screen
-        screen.fill(BG_COLOUR)
+        # Forest Guard theme gradient background (same as menu)
+        for y in range(screen_h):
+            color_ratio = y / screen_h
+            r = int(135 + (173 - 135) * color_ratio)
+            g = int(206 + (216 - 206) * color_ratio)
+            b = int(235 + (230 - 235) * color_ratio)
+            pygame.draw.line(screen, (r, g, b), (0, y), (screen_w, y))
         
         # Draw main UI
         self.draw_toolbar(screen, screen_w)
@@ -542,7 +547,7 @@ class LevelCreator:
             self.draw_complete_save_dialog(screen, screen_w, screen_h)
 
     def draw_complete_save_dialog(self, screen, screen_w, screen_h):
-        """Draw the complete save dialog with all settings"""
+        """Draw the complete save dialog with Forest Guard theme"""
         dialog_w, dialog_h = 600, 500
         dialog_x = (screen_w - dialog_w) // 2
         dialog_y = (screen_h - dialog_h) // 2
@@ -552,14 +557,17 @@ class LevelCreator:
         overlay.fill((0, 0, 0, 150))
         screen.blit(overlay, (0, 0))
         
-        # Dialog box
+        # Dialog box with Forest Guard theme
         dialog_rect = pygame.Rect(dialog_x, dialog_y, dialog_w, dialog_h)
-        pygame.draw.rect(screen, UI_DARK_BG, dialog_rect, border_radius=15)
-        pygame.draw.rect(screen, UI_ACCENT, dialog_rect, 3, border_radius=15)
+        pygame.draw.rect(screen, CREAM, dialog_rect, border_radius=15)
+        pygame.draw.rect(screen, BROWN, dialog_rect, 4, border_radius=15)
         
-        # Title
-        title_text = FONTS['title'].render("Save Level", True, WHITE)
+        # Title with Forest Guard style
+        title_text = FONTS['title'].render("Save Level", True, FOREST_GREEN)
+        title_shadow = FONTS['title'].render("Save Level", True, BLACK)
         title_x = dialog_x + (dialog_w - title_text.get_width()) // 2
+        # Draw shadow first
+        screen.blit(title_shadow, (title_x + 2, dialog_y + 22))
         screen.blit(title_text, (title_x, dialog_y + 20))
         
         # Input fields
@@ -572,26 +580,26 @@ class LevelCreator:
         
         for label_text, field_name, y_pos in field_configs:
             # Label
-            label = FONTS['hud'].render(label_text, True, WHITE)
+            label = FONTS['hud'].render(label_text, True, DARK_GREEN)
             screen.blit(label, (dialog_x + 30, y_pos))
             
-            # Input field
+            # Input field with Forest Guard theme
             field_rect = pygame.Rect(dialog_x + 250, y_pos, 200, 30)
             is_active = self.active_input_field == field_name
-            field_color = UI_ACCENT if is_active else UI_MID_BG
+            field_color = LIGHT_GREEN if is_active else WHITE
             
             pygame.draw.rect(screen, field_color, field_rect, border_radius=5)
-            pygame.draw.rect(screen, WHITE, field_rect, 2, border_radius=5)
+            pygame.draw.rect(screen, FOREST_GREEN, field_rect, 2, border_radius=5)
             
             # Input text
             display_text = self.settings_inputs[field_name]
-            input_text = FONTS['hud'].render(display_text, True, WHITE)
+            input_text = FONTS['hud'].render(display_text, True, BLACK)
             screen.blit(input_text, (field_rect.x + 10, field_rect.y + 5))
             
             # Cursor for active field
             if is_active and pygame.time.get_ticks() % 1000 < 500:
                 cursor_x = field_rect.x + 10 + input_text.get_width()
-                pygame.draw.line(screen, WHITE, (cursor_x, field_rect.y + 5), (cursor_x, field_rect.y + 25), 2)
+                pygame.draw.line(screen, DARK_GREEN, (cursor_x, field_rect.y + 5), (cursor_x, field_rect.y + 25), 2)
         
         # Help text
         help_texts = [
@@ -603,7 +611,7 @@ class LevelCreator:
         ]
         
         for i, help_text in enumerate(help_texts):
-            color = UI_ACCENT if i == 0 else (200, 200, 200)
+            color = FOREST_GREEN if i == 0 else DARK_GREEN
             text = FONTS['small'].render(help_text, True, color)
             screen.blit(text, (dialog_x + 30, dialog_y + 310 + i * 20))
         
@@ -615,10 +623,11 @@ class LevelCreator:
         
         mx, my = pygame.mouse.get_pos()
         save_hover = save_rect.collidepoint(mx, my)
-        save_color = UI_SUCCESS if save_hover else UI_MID_BG
+        save_color = LIGHT_GREEN if save_hover else FOREST_GREEN
         
+        # Save button with Forest Guard style
         pygame.draw.rect(screen, save_color, save_rect, border_radius=5)
-        pygame.draw.rect(screen, UI_SUCCESS, save_rect, 2, border_radius=5)
+        pygame.draw.rect(screen, DARK_GREEN, save_rect, 3, border_radius=5)
         save_text = FONTS['button'].render("Save", True, WHITE)
         save_text_x = save_x + (80 - save_text.get_width()) // 2
         save_text_y = save_y + (40 - save_text.get_height()) // 2
@@ -630,25 +639,32 @@ class LevelCreator:
         cancel_rect = pygame.Rect(cancel_x, cancel_y, 80, 40)
         
         cancel_hover = cancel_rect.collidepoint(mx, my)
-        cancel_color = UI_DANGER if cancel_hover else UI_MID_BG
+        cancel_color = RED if cancel_hover else BROWN
         
+        # Cancel button with Forest Guard style
         pygame.draw.rect(screen, cancel_color, cancel_rect, border_radius=5)
-        pygame.draw.rect(screen, UI_DANGER, cancel_rect, 2, border_radius=5)
+        pygame.draw.rect(screen, DARK_GREEN, cancel_rect, 3, border_radius=5)
         cancel_text = FONTS['button'].render("Cancel", True, WHITE)
         cancel_text_x = cancel_x + (80 - cancel_text.get_width()) // 2
         cancel_text_y = cancel_y + (40 - cancel_text.get_height()) // 2
         screen.blit(cancel_text, (cancel_text_x, cancel_text_y))
         
         # Instructions
-        instr_text = FONTS['small'].render("Click fields to edit, then press Save", True, (180, 180, 180))
+        instr_text = FONTS['small'].render("Click fields to edit, then press Save", True, BROWN)
         instr_x = dialog_x + (dialog_w - instr_text.get_width()) // 2
         screen.blit(instr_text, (instr_x, dialog_y + dialog_h - 25))
 
     def draw_toolbar(self, screen, screen_w):
-        """Draw the modern toolbar"""
-        # Background
-        pygame.draw.rect(screen, UI_DARK_BG, (0, 0, screen_w, UI_HEIGHT))
-        pygame.draw.line(screen, UI_MID_BG, (0, UI_HEIGHT-1), (screen_w, UI_HEIGHT-1), 2)
+        """Draw the Forest Guard themed toolbar"""
+        # Forest themed background with wood texture effect
+        toolbar_rect = pygame.Rect(0, 0, screen_w, UI_HEIGHT)
+        pygame.draw.rect(screen, BROWN, toolbar_rect)
+        pygame.draw.rect(screen, DARK_GREEN, toolbar_rect, 4)
+        
+        # Add wood grain effect
+        for i in range(0, screen_w, 40):
+            grain_color = (139 + 10, 69 + 10, 19 + 10)  # Slightly lighter brown
+            pygame.draw.line(screen, grain_color, (i, 0), (i, UI_HEIGHT), 1)
         
         # Tool buttons
         button_width = 150
@@ -674,12 +690,17 @@ class LevelCreator:
             else:
                 button_color = tool['color']
             
-            # Draw button with rounded corners
+            # Draw button with Forest Guard style (shadow + rounded corners)
+            # Shadow first
+            shadow_rect = pygame.Rect(x + 2, y + 2, button_width, button_height)
+            pygame.draw.rect(screen, (0, 0, 0, 50), shadow_rect, border_radius=8)
+            
+            # Main button
             pygame.draw.rect(screen, button_color, (x, y, button_width, button_height), border_radius=8)
             
             # Button border
-            border_color = WHITE if is_selected else UI_MID_BG
-            pygame.draw.rect(screen, border_color, (x, y, button_width, button_height), 2, border_radius=8)
+            border_color = WHITE if is_selected else DARK_GREEN
+            pygame.draw.rect(screen, border_color, (x, y, button_width, button_height), 3, border_radius=8)
             
             # Icon and text
             icon_text = FONTS['button'].render(tool['icon'], True, WHITE)
@@ -691,12 +712,15 @@ class LevelCreator:
             screen.blit(icon_text, (icon_x, y + 8))
             screen.blit(name_text, (name_x, y + 28))
         
-        # Title
-        title_text = FONTS['subtitle'].render("Level Creator", True, WHITE)
+        # Title with Forest Guard style
+        title_text = FONTS['subtitle'].render("Level Creator", True, CREAM)
+        title_shadow = FONTS['subtitle'].render("Level Creator", True, BLACK)
+        # Draw shadow first
+        screen.blit(title_shadow, (screen_w - title_text.get_width() - 18, 22))
         screen.blit(title_text, (screen_w - title_text.get_width() - 20, 20))
         
         # Instructions
-        instr_text = FONTS['small'].render("ESC: Return to Menu", True, (200, 200, 200))
+        instr_text = FONTS['small'].render("ESC: Return to Menu", True, CREAM)
         screen.blit(instr_text, (screen_w - instr_text.get_width() - 20, 50))
     
     def draw_grid(self, screen, screen_w, screen_h):
