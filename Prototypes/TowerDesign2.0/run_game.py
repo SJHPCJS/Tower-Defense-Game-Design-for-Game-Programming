@@ -15,4 +15,4 @@ if __name__ == "__main__":
     print("Starting Forest Guard...")
     print("Defend the Forest from Invaders!")
     print("-" * 40)
-    main() 
+    main()

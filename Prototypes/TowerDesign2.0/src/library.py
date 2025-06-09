@@ -3,6 +3,7 @@ import os
 import math
 from settings import *
 from library_data import LIBRARY_DATA, TOWERS, ENEMIES
+from audio_manager import audio_manager
 
 class ImageCache:
     """Image cache system to avoid repeated loading"""
@@ -198,6 +199,9 @@ class CharacterLibrary:
         self.story_font = pygame.font.SysFont('Arial', 16)
         self.stats_font = pygame.font.SysFont('Arial', 18, bold=True)
         self.label_font = pygame.font.SysFont('Arial', 22, bold=True)
+        
+        # 播放菜单音乐
+        audio_manager.play_menu_music()
         
         self.init_cards()
         self.load_character_animator()

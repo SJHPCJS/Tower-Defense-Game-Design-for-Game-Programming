@@ -2,7 +2,10 @@ import pygame
 import sys
 import os
 import json
+import math
+import random
 from settings import *
+from audio_manager import audio_manager
 
 class Button:
     def __init__(self, x, y, width, height, text, color=FOREST_GREEN, hover_color=LIGHT_GREEN, text_color=WHITE):
@@ -13,21 +16,44 @@ class Button:
         self.text_color = text_color
         self.is_hovered = False
         self.font = pygame.font.SysFont('Arial', 24, bold=True)
+        
+        # Add animation effects
+        self.hover_scale = 1.0
+        self.shadow_offset = 2
 
     def draw(self, screen):
+        # Update hover animation
+        target_scale = 1.05 if self.is_hovered else 1.0
+        self.hover_scale += (target_scale - self.hover_scale) * 0.1
+        
+        # Calculate scaled rectangle
+        original_center = self.rect.center
+        scaled_width = int(self.rect.width * self.hover_scale)
+        scaled_height = int(self.rect.height * self.hover_scale)
+        scaled_rect = pygame.Rect(0, 0, scaled_width, scaled_height)
+        scaled_rect.center = original_center
+        
         color = self.hover_color if self.is_hovered else self.color
-        # Draw button with rounded corners effect
-        pygame.draw.rect(screen, color, self.rect)
-        pygame.draw.rect(screen, DARK_GREEN, self.rect, 3)
+        shadow_offset = self.shadow_offset + (2 if self.is_hovered else 0)
         
-        # Add shadow effect
-        shadow_rect = pygame.Rect(self.rect.x + 2, self.rect.y + 2, self.rect.width, self.rect.height)
-        pygame.draw.rect(screen, (0, 0, 0, 50), shadow_rect)
-        pygame.draw.rect(screen, color, self.rect)
-        pygame.draw.rect(screen, DARK_GREEN, self.rect, 3)
+        # Draw shadow (enhanced effect)
+        shadow_rect = pygame.Rect(scaled_rect.x + shadow_offset, scaled_rect.y + shadow_offset, 
+                                scaled_rect.width, scaled_rect.height)
+        pygame.draw.rect(screen, (0, 0, 0, 100), shadow_rect, border_radius=8)
         
+        # Draw button body
+        pygame.draw.rect(screen, color, scaled_rect, border_radius=8)
+        pygame.draw.rect(screen, DARK_GREEN, scaled_rect, 3, border_radius=8)
+        
+        # Add inner border highlight effect
+        if self.is_hovered:
+            highlight_rect = pygame.Rect(scaled_rect.x + 2, scaled_rect.y + 2, 
+                                       scaled_rect.width - 4, scaled_rect.height - 4)
+            pygame.draw.rect(screen, (255, 255, 255, 50), highlight_rect, 2, border_radius=6)
+        
+        # Draw text
         text_surface = self.font.render(self.text, True, self.text_color)
-        text_rect = text_surface.get_rect(center=self.rect.center)
+        text_rect = text_surface.get_rect(center=scaled_rect.center)
         screen.blit(text_surface, text_rect)
 
     def handle_event(self, event):
@@ -44,7 +70,14 @@ class MainMenu:
         self.title_font = pygame.font.SysFont('Arial', 72, bold=True)
         self.subtitle_font = pygame.font.SysFont('Arial', 24)
         
-        # Buttons
+        # Add natural element animation
+        self.title_wave = 0.0
+        self.init_natural_effects()
+        
+        # Play menu music
+        audio_manager.play_menu_music()
+        
+        # Buttons with enhanced styling
         button_width, button_height = 250, 60
         button_x = DEFAULT_SCREEN_W // 2 - button_width // 2
         
@@ -53,15 +86,217 @@ class MainMenu:
         self.create_button = Button(button_x, DEFAULT_SCREEN_H // 2 + 50, button_width, button_height, "Create a Level")
         self.quit_button = Button(button_x, DEFAULT_SCREEN_H // 2 + 110, button_width, button_height, "Quit", color=BROWN, hover_color=RED)
         
+    def init_natural_effects(self):
+        """Initialize natural effect elements"""
+        # Pixel style clouds
+        self.clouds = []
+        for i in range(4):  # Reduce cloud count for better performance
+            self.clouds.append({
+                'x': random.randint(-200, DEFAULT_SCREEN_W),
+                'y': random.randint(30, 250),
+                'speed': random.uniform(0.3, 1.0),
+                'size': random.randint(60, 120),
+                'offset': random.uniform(0, 2 * math.pi),
+                'type': random.choice(['normal', 'large'])  # Different cloud types
+            })
+        
+        # Falling leaves
+        self.leaves = []
+        for i in range(12):  # Slightly reduce leaf count
+            self.leaves.append({
+                'x': random.randint(0, DEFAULT_SCREEN_W),
+                'y': random.randint(-100, DEFAULT_SCREEN_H),
+                'speed_x': random.uniform(-0.3, 0.3),
+                'speed_y': random.uniform(0.8, 2.5),
+                'rotation': random.uniform(0, 360),
+                'rotation_speed': random.uniform(-1.5, 1.5),
+                'color': random.choice([
+                    (34, 139, 34), (107, 142, 35), (85, 107, 47), 
+                    (154, 205, 50), (50, 205, 50), (46, 125, 50)
+                ]),
+                'size': random.randint(6, 14),
+                'wobble': random.uniform(0, 2 * math.pi)  # Wobble phase
+            })
+        
+        # Firefly effect
+        self.fireflies = []
+        for i in range(6):  # Reduce firefly count
+            self.fireflies.append({
+                'x': random.randint(100, DEFAULT_SCREEN_W - 100),
+                'y': random.randint(300, DEFAULT_SCREEN_H - 100),
+                'target_x': random.randint(100, DEFAULT_SCREEN_W - 100),
+                'target_y': random.randint(300, DEFAULT_SCREEN_H - 100),
+                'glow': random.uniform(0, 2 * math.pi),
+                'glow_speed': random.uniform(0.03, 0.08),
+                'move_timer': random.randint(60, 180)  # Movement timer
+            })
+
+    def draw_pixel_clouds(self, screen, screen_w, screen_h):
+        """Draw pixel style clouds"""
+        for cloud in self.clouds:
+            # Update cloud position
+            cloud['x'] += cloud['speed']
+            if cloud['x'] > screen_w + cloud['size']:
+                cloud['x'] = -cloud['size']
+                cloud['y'] = random.randint(30, 250)  # Randomly reset height
+            
+            # Add slight vertical floating
+            float_y = cloud['y'] + math.sin(pygame.time.get_ticks() * 0.0008 + cloud['offset']) * 6
+            
+            # Draw pixelated clouds
+            base_x, base_y = int(cloud['x']), int(float_y)
+            size = cloud['size']
+            block_size = max(6, size // 10)  # Adjust pixel block size
+            
+            # Choose different shapes based on cloud type
+            if cloud['type'] == 'large':
+                cloud_pattern = [
+                    "      ████████████      ",
+                    "    ████████████████    ",
+                    "  ████████████████████  ",
+                    "████████████████████████",
+                    "████████████████████████",
+                    " ██████████████████████ ",
+                    "  ████████████████████  "
+                ]
+            else:
+                cloud_pattern = [
+                    "    ████████    ",
+                    "  ████████████  ",
+                    "████████████████",
+                    "████████████████",
+                    " ██████████████ ",
+                    "  ████████████  "
+                ]
+            
+            # Draw cloud pixel blocks
+            for row, pattern in enumerate(cloud_pattern):
+                for col, pixel in enumerate(pattern):
+                    if pixel == '█':
+                        pixel_x = base_x + (col - len(pattern[0])//2) * block_size
+                        pixel_y = base_y + row * block_size
+                        
+                        # Ensure within screen bounds
+                        if 0 <= pixel_x < screen_w and 0 <= pixel_y < screen_h:
+                            # Cloud color gradient
+                            distance_from_center = abs(col - len(pattern[0])//2)
+                            alpha = max(180, 240 - distance_from_center * 8)
+                            cloud_color = (255, 255, 255)
+                            
+                            # Draw pixel block
+                            pygame.draw.rect(screen, cloud_color, 
+                                           (pixel_x, pixel_y, block_size, block_size))
+
+    def draw_falling_leaves(self, screen, screen_w, screen_h):
+        """Draw falling leaves"""
+        for leaf in self.leaves:
+            # Update leaf position
+            leaf['wobble'] += 0.05
+            leaf['x'] += leaf['speed_x'] + math.sin(leaf['wobble']) * 0.8  # Enhanced wobble effect
+            leaf['y'] += leaf['speed_y']
+            leaf['rotation'] += leaf['rotation_speed']
+            
+            # Reset leaves that go off screen
+            if leaf['y'] > screen_h + 30:
+                leaf['y'] = -30
+                leaf['x'] = random.randint(-30, screen_w + 30)
+                leaf['wobble'] = random.uniform(0, 2 * math.pi)
+            
+            if leaf['x'] < -100:
+                leaf['x'] = screen_w + 100
+            elif leaf['x'] > screen_w + 100:
+                leaf['x'] = -100
+            
+            # Only draw if within visible range
+            if -50 <= leaf['x'] <= screen_w + 50 and -50 <= leaf['y'] <= screen_h + 50:
+                # Create leaf surface
+                leaf_size = leaf['size']
+                leaf_surface = pygame.Surface((leaf_size * 2, leaf_size * 2), pygame.SRCALPHA)
+                
+                # Draw more realistic leaf shape
+                points = []
+                for i in range(8):
+                    angle = i * math.pi / 4
+                    if i % 2 == 0:
+                        radius = leaf_size * 0.8
+                    else:
+                        radius = leaf_size * 0.4
+                    x = leaf_size + radius * math.cos(angle)
+                    y = leaf_size + radius * math.sin(angle) * 1.2  # Elongate leaf
+                    points.append((x, y))
+                
+                pygame.draw.polygon(leaf_surface, leaf['color'], points)
+                
+                # Rotate and draw leaf
+                rotated_leaf = pygame.transform.rotate(leaf_surface, leaf['rotation'])
+                leaf_rect = rotated_leaf.get_rect(center=(leaf['x'], leaf['y']))
+                screen.blit(rotated_leaf, leaf_rect)
+
+    def draw_fireflies(self, screen, screen_w, screen_h):
+        """Draw firefly effect"""
+        for firefly in self.fireflies:
+            firefly['move_timer'] -= 1
+            
+            # Update firefly position (move towards target)
+            dx = firefly['target_x'] - firefly['x']
+            dy = firefly['target_y'] - firefly['y']
+            distance = math.sqrt(dx*dx + dy*dy)
+            
+            if distance < 10 or firefly['move_timer'] <= 0:
+                # Choose new target
+                firefly['target_x'] = random.randint(100, screen_w - 100)
+                firefly['target_y'] = random.randint(300, screen_h - 100)
+                firefly['move_timer'] = random.randint(120, 300)
+            else:
+                # Slowly move towards target
+                speed = 0.008
+                firefly['x'] += dx * speed
+                firefly['y'] += dy * speed
+            
+            # Add random drift
+            firefly['x'] += random.uniform(-0.5, 0.5)
+            firefly['y'] += random.uniform(-0.5, 0.5)
+            
+            # Keep within screen bounds
+            firefly['x'] = max(50, min(screen_w - 50, firefly['x']))
+            firefly['y'] = max(250, min(screen_h - 50, firefly['y']))
+            
+            # Update glow effect
+            firefly['glow'] += firefly['glow_speed']
+            glow_intensity = (math.sin(firefly['glow']) + 1) * 0.5
+            
+            # Draw firefly (performance optimized)
+            if glow_intensity > 0.3:  # Only draw when bright enough
+                glow_size = int(6 + glow_intensity * 3)
+                
+                # Simplified glow effect
+                for i in range(2, 0, -1):
+                    alpha = int(40 * glow_intensity / i)
+                    color = (255, 255, 100 + int(50 * glow_intensity))
+                    pygame.draw.circle(screen, color, 
+                                     (int(firefly['x']), int(firefly['y'])), 
+                                     glow_size + i * 3)
+                
+                # Core light point
+                pygame.draw.circle(screen, (255, 255, 200), 
+                                 (int(firefly['x']), int(firefly['y'])), 2)
+
     def draw_background(self, screen):
         screen_w, screen_h = screen.get_size()
-        # Gradient background
+        
+        # Enhanced gradient background (sky to horizon)
         for y in range(screen_h):
             color_ratio = y / screen_h
-            r = int(135 + (173 - 135) * color_ratio)
-            g = int(206 + (216 - 206) * color_ratio)
-            b = int(235 + (230 - 235) * color_ratio)
+            # From sky blue gradient to warmer horizon color
+            r = int(135 + (200 - 135) * color_ratio)
+            g = int(206 + (220 - 206) * color_ratio)
+            b = int(235 + (200 - 235) * color_ratio)
             pygame.draw.line(screen, (r, g, b), (0, y), (screen_w, y))
+        
+        # Draw natural effects
+        self.draw_pixel_clouds(screen, screen_w, screen_h)
+        self.draw_falling_leaves(screen, screen_w, screen_h)
+        self.draw_fireflies(screen, screen_w, screen_h)
         
     def run(self):
         while True:
@@ -104,25 +339,40 @@ class MainMenu:
             
             self.draw_background(current_screen)
             
-            # Draw title
+            # Update title animation
+            self.title_wave += 0.03
+            wave_offset = math.sin(self.title_wave) * 8
+            
+            # Draw enhanced title (without shadows)
+            title_y = screen_h // 4 + int(wave_offset)
+            
+            # Main title only (no shadow effects)
             title = self.title_font.render("Forest Guard", True, DARK_GREEN)
-            title_rect = title.get_rect(center=(screen_w // 2, screen_h // 4))
-            # Title shadow
-            title_shadow = self.title_font.render("Forest Guard", True, BLACK)
-            shadow_rect = title_shadow.get_rect(center=(screen_w // 2 + 3, screen_h // 4 + 3))
-            current_screen.blit(title_shadow, shadow_rect)
+            title_rect = title.get_rect(center=(screen_w // 2, title_y))
             current_screen.blit(title, title_rect)
             
-            # Subtitle
+            # Enhanced subtitle
+            subtitle_y = title_y + 80
             subtitle = self.subtitle_font.render("Defend the Forest from Invaders!", True, FOREST_GREEN)
-            subtitle_rect = subtitle.get_rect(center=(screen_w // 2, screen_h // 4 + 80))
+            subtitle_rect = subtitle.get_rect(center=(screen_w // 2, subtitle_y))
+            
+            # Subtitle shadow (minimal)
+            subtitle_shadow = self.subtitle_font.render("Defend the Forest from Invaders!", True, (0, 50, 0))
+            shadow_rect = subtitle_shadow.get_rect(center=(screen_w // 2 + 1, subtitle_y + 1))
+            current_screen.blit(subtitle_shadow, shadow_rect)
             current_screen.blit(subtitle, subtitle_rect)
             
-            # Draw buttons
+            # Draw enhanced buttons
             self.start_button.draw(current_screen)
             self.library_button.draw(current_screen)
             self.create_button.draw(current_screen)
             self.quit_button.draw(current_screen)
+            
+            # Add version info
+            version_font = pygame.font.SysFont('Arial', 16)
+            version_text = version_font.render("Forest Guard v2.0", True, (100, 100, 100))
+            version_rect = version_text.get_rect(bottomright=(screen_w - 10, screen_h - 10))
+            current_screen.blit(version_text, version_rect)
             
             pygame.display.flip()
             clock.tick(FPS)

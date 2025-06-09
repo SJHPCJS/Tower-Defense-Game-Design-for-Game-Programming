@@ -9,6 +9,7 @@ from typing import List, Tuple, Set
 from pathlib import Path
 from settings import *
 from pathfinding import a_star
+from audio_manager import audio_manager
 
 class LevelCreator:
     def __init__(self):
@@ -24,6 +25,13 @@ class LevelCreator:
         self.message = ""
         self.message_color = WHITE
         self.message_timer = 0
+        
+        # Mouse drag state for path drawing
+        self.is_dragging = False
+        self.last_drag_pos = None
+        
+        # 播放菜单音乐
+        audio_manager.play_menu_music()
         
         # Load tile images
         self._load_tile_images()
@@ -56,7 +64,9 @@ class LevelCreator:
             {'id': 'place_path', 'name': 'Place Path', 'icon': 'PATH', 'color': FOREST_GREEN, 'hover': LIGHT_GREEN},
             {'id': 'delete_path', 'name': 'Delete Path', 'icon': 'DEL', 'color': BROWN, 'hover': RED},
             {'id': 'reset_map', 'name': 'Reset Map', 'icon': 'RESET', 'color': GOLD, 'hover': YELLOW},
-            {'id': 'ai_generate', 'name': 'AI Generate', 'icon': 'AI', 'color': DARK_GREEN, 'hover': FOREST_GREEN},
+            {'id': 'direct_path', 'name': 'Direct Path', 'icon': 'LINE', 'color': DARK_GREEN, 'hover': FOREST_GREEN},
+            {'id': 'maze_loops', 'name': 'Branch Maze', 'icon': 'MAZE', 'color': (70, 130, 180), 'hover': (100, 149, 237)},
+            {'id': 'organic_paths', 'name': 'Organic Paths', 'icon': 'ORG', 'color': (139, 69, 19), 'hover': (160, 82, 45)},
             {'id': 'save_level', 'name': 'Save Level', 'icon': 'SAVE', 'color': UI_ACCENT, 'hover': (100, 150, 200)}
         ]
         
@@ -125,6 +135,109 @@ class LevelCreator:
                 temp_grid[ny][nx] = 0
                 if random.random() < 0.25:
                     dir = random.choice([(1,0),(-1,0),(0,1),(0,-1)])
+        
+        # Optimize the generated path
+        if strategy == "optimal":
+            useful_nodes = self.find_all_optimal_path_nodes(temp_grid, self.spawn, self.home)
+        else:
+            useful_nodes = self.find_all_reasonable_path_nodes(temp_grid, self.spawn, self.home, tolerance=3)
+        
+        # Clean up useless path tiles
+        for y in range(GRID_H):
+            for x in range(GRID_W):
+                if temp_grid[y][x] == 0 and (x, y) not in useful_nodes:
+                    temp_grid[y][x] = 1  # Convert back to grass
+        
+        return temp_grid
+    
+    def algo_maze_loops_optimized(self, strategy="optimal"):
+        """Generate AI path using the optimized maze loops algorithm"""
+        # Generate maze using DFS with loops
+        loop_fraction = random.uniform(0.05, 0.35)
+        temp_grid = [[1]*GRID_W for _ in range(GRID_H)]
+        
+        # Start maze generation from spawn
+        stack = [self.spawn]
+        temp_grid[self.spawn[1]][self.spawn[0]] = 0
+        
+        while stack:
+            x, y = stack[-1]
+            dirs = [(2,0), (-2,0), (0,2), (0,-2)]
+            random.shuffle(dirs)
+            moved = False
+            
+            for dx, dy in dirs:
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < GRID_W and 0 <= ny < GRID_H and temp_grid[ny][nx] == 1:
+                    temp_grid[ny][nx] = 0
+                    temp_grid[y + dy//2][x + dx//2] = 0
+                    stack.append((nx, ny))
+                    moved = True
+                    break
+                    
+            if not moved:
+                stack.pop()
+        
+        # Add loops by removing some walls
+        walls = [(x, y) for y in range(GRID_H) for x in range(GRID_W) if temp_grid[y][x] == 1]
+        random.shuffle(walls)
+        
+        for x, y in walls[:int(len(walls) * loop_fraction)]:
+            if sum(temp_grid[ny][nx] == 0 for nx, ny in self.neighbors4(x, y)) >= 2:
+                temp_grid[y][x] = 0
+        
+        # Ensure home is accessible
+        temp_grid[self.home[1]][self.home[0]] = 0
+        
+        # Optimize the generated path
+        if strategy == "optimal":
+            useful_nodes = self.find_all_optimal_path_nodes(temp_grid, self.spawn, self.home)
+        else:
+            useful_nodes = self.find_all_reasonable_path_nodes(temp_grid, self.spawn, self.home, tolerance=3)
+        
+        # Clean up useless path tiles
+        for y in range(GRID_H):
+            for x in range(GRID_W):
+                if temp_grid[y][x] == 0 and (x, y) not in useful_nodes:
+                    temp_grid[y][x] = 1  # Convert back to grass
+        
+        return temp_grid
+    
+    def algo_prim_loops_optimized(self, strategy="optimal"):
+        """Generate AI path using the optimized prim loops algorithm"""
+        # Generate maze using Prim's algorithm with loops
+        loop_chance = random.uniform(0.15, 0.4)
+        temp_grid = [[1]*GRID_W for _ in range(GRID_H)]
+        
+        # Initialize frontier with spawn
+        frontier = [self.spawn]
+        temp_grid[self.spawn[1]][self.spawn[0]] = 0
+        
+        while frontier:
+            x, y = random.choice(frontier)
+            frontier.remove((x, y))
+            
+            dirs = [(2,0), (-2,0), (0,2), (0,-2)]
+            random.shuffle(dirs)
+            
+            for dx, dy in dirs:
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < GRID_W and 0 <= ny < GRID_H and temp_grid[ny][nx] == 1:
+                    # Connect through the wall
+                    temp_grid[y + dy//2][x + dx//2] = 0
+                    temp_grid[ny][nx] = 0
+                    frontier.append((nx, ny))
+        
+        # Add loops by randomly opening walls
+        for y in range(GRID_H):
+            for x in range(GRID_W):
+                if (temp_grid[y][x] == 1 and 
+                    random.random() < loop_chance and
+                    sum(temp_grid[ny][nx] == 0 for nx, ny in self.neighbors4(x, y)) >= 2):
+                    temp_grid[y][x] = 0
+        
+        # Ensure home is accessible
+        temp_grid[self.home[1]][self.home[0]] = 0
         
         # Optimize the generated path
         if strategy == "optimal":
@@ -318,7 +431,25 @@ class LevelCreator:
                 if result:
                     return result
             else:
+                # Start drag operation for path tools
+                if self.selected_tool in ["place_path", "delete_path"]:
+                    self.is_dragging = True
+                    gx, gy = px_to_grid(mx, my, screen_w, screen_h)
+                    self.last_drag_pos = (gx, gy)
                 self.handle_grid_click(mx, my, screen_w, screen_h)
+        elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            # End drag operation
+            self.is_dragging = False
+            self.last_drag_pos = None
+        elif event.type == pygame.MOUSEMOTION:
+            if self.is_dragging and not self.save_dialog_active:
+                mx, my = event.pos
+                screen = pygame.display.get_surface()
+                screen_w, screen_h = screen.get_size()
+                
+                # Only drag in grid area
+                if my >= UI_HEIGHT:
+                    self.handle_grid_drag(mx, my, screen_w, screen_h)
         elif event.type == pygame.VIDEORESIZE:
             new_width = max(event.w, MIN_SCREEN_W)
             new_height = max(event.h, MIN_SCREEN_H)
@@ -331,9 +462,9 @@ class LevelCreator:
 
     def handle_toolbar_click(self, mx, my, screen_w):
         """Handle toolbar button clicks"""
-        button_width = 150
+        button_width = 130
         button_height = 50
-        margin = 10
+        margin = 8
         start_x = margin
         
         for i, tool in enumerate(self.tools):
@@ -356,8 +487,12 @@ class LevelCreator:
                         self.show_message("No valid path found!", UI_DANGER)
                 elif tool['id'] == 'reset_map':
                     self.reset_map()
-                elif tool['id'] == 'ai_generate':
-                    self.ai_generate_map()
+                elif tool['id'] == 'direct_path':
+                    self.ai_generate_map("direct_path")
+                elif tool['id'] == 'maze_loops':
+                    self.ai_generate_map("maze_loops")
+                elif tool['id'] == 'organic_paths':
+                    self.ai_generate_map("organic_paths")
                 else:
                     self.selected_tool = tool['id']
                 break
@@ -372,6 +507,26 @@ class LevelCreator:
                 self.grid[gy][gx] = 0
             elif self.selected_tool == "delete_path":
                 self.grid[gy][gx] = 1
+
+    def handle_grid_drag(self, mx, my, screen_w, screen_h):
+        """Handle mouse drag over grid to paint paths"""
+        gx, gy = px_to_grid(mx, my, screen_w, screen_h)
+        
+        # Only paint if we're in a valid grid position
+        if not (0 <= gx < GRID_W and 0 <= gy < GRID_H):
+            return
+            
+        # Avoid painting the same cell repeatedly
+        if self.last_drag_pos and self.last_drag_pos == (gx, gy):
+            return
+            
+        self.last_drag_pos = (gx, gy)
+        
+        # Apply the current tool
+        if self.selected_tool == "place_path":
+            self.grid[gy][gx] = 0
+        elif self.selected_tool == "delete_path":
+            self.grid[gy][gx] = 1
 
     def handle_save_dialog_click(self, mx, my, screen_w, screen_h):
         """Handle save dialog clicks"""
@@ -416,18 +571,36 @@ class LevelCreator:
         self.grid[self.home[1]][self.home[0]] = 0
         self.show_message("Map reset to grass!", UI_SUCCESS)
 
-    def ai_generate_map(self):
-        """Generate a map using AI pathfinding"""
+    def ai_generate_map(self, algorithm="direct_path"):
+        """Generate a map using different AI algorithms"""
         try:
-            # Use the optimized algorithm to generate path
-            new_grid = self.algo_tower_path_optimized("optimal")
+            # Store original spawn and home positions
+            original_spawn = self.spawn
+            original_home = self.home
+            
+            if algorithm == "direct_path":
+                new_grid = self.algo_tower_path_optimized("optimal")
+                message = "Direct path generated successfully!"
+            elif algorithm == "maze_loops":
+                new_grid = self.algo_maze_loops_optimized("optimal")
+                message = "Branch maze generated successfully!"
+            elif algorithm == "organic_paths":
+                new_grid = self.algo_prim_loops_optimized("optimal")
+                message = "Organic paths generated successfully!"
+            else:
+                new_grid = self.algo_tower_path_optimized("optimal")
+                message = "AI generated path successfully!"
+            
             self.grid = new_grid
             
-            # Update spawn and home
-            self.spawn = self.find_best_start_point()
-            self.home = self.find_best_end_point()
+            # Keep original spawn and home positions instead of finding new ones
+            # Only ensure they are set as path tiles
+            self.spawn = original_spawn
+            self.home = original_home
+            self.grid[self.spawn[1]][self.spawn[0]] = 0  # Ensure spawn is path
+            self.grid[self.home[1]][self.home[0]] = 0   # Ensure home is path
             
-            self.show_message("AI generated path successfully!", UI_SUCCESS)
+            self.show_message(message, UI_SUCCESS)
         except Exception as e:
             self.show_message(f"AI generation failed: {str(e)}", UI_DANGER)
     
@@ -484,9 +657,10 @@ class LevelCreator:
             self.show_message("Invalid numeric values!", UI_DANGER)
             return False
         
-        # Update spawn and home
-        self.spawn = self.find_best_start_point()
-        self.home = self.find_best_end_point()
+        # Don't update spawn and home when saving - keep user's current positions
+        # Just ensure they are path tiles
+        self.grid[self.spawn[1]][self.spawn[0]] = 0  # Ensure spawn is path
+        self.grid[self.home[1]][self.home[0]] = 0   # Ensure home is path
         
         # Create level data
         level_data = {
@@ -667,9 +841,9 @@ class LevelCreator:
             pygame.draw.line(screen, grain_color, (i, 0), (i, UI_HEIGHT), 1)
         
         # Tool buttons
-        button_width = 150
+        button_width = 130
         button_height = 50
-        margin = 10
+        margin = 8
         start_x = margin
         
         mx, my = pygame.mouse.get_pos()

@@ -13,6 +13,7 @@ from map_component import MapComponent
 from level import Level
 from tower import TowerFactory
 from bullet import Bullet
+from audio_manager import audio_manager
 
 class TowerButtonCache:
     """防御塔按钮图片缓存"""
@@ -27,18 +28,17 @@ class TowerButtonCache:
             try:
                 library_image_path = f"assets/library/tower/{tower_name}.png"
                 image = pygame.image.load(library_image_path)
-                # 缩放图片
+
                 scaled_image = pygame.transform.scale(image, size)
                 
                 if grayscale:
-                    # 预先计算灰度图像
                     gray_image = pygame.Surface(size, pygame.SRCALPHA)
                     for x in range(size[0]):
                         for y in range(size[1]):
                             color = scaled_image.get_at((x, y))
-                            if color[3] > 0:  # 只处理非透明像素
+                            if color[3] > 0:
                                 gray = int(0.299 * color.r + 0.587 * color.g + 0.114 * color.b)
-                                gray_color = (gray // 3, gray // 3, gray // 3, color.a)  # 更暗的灰度
+                                gray_color = (gray // 3, gray // 3, gray // 3, color.a)
                                 gray_image.set_at((x, y), gray_color)
                     cls._tower_images[cache_key] = gray_image
                 else:
@@ -142,10 +142,15 @@ class Game:
         selected_tower = None
         current_screen_size = screen.get_size()
         
-        # Game timing
-        start_time = time.time()
+        # Game timing - initially paused for level start message
+        start_time = None  # Will be set after countdown
         current_game_time = 0.0
         is_new_best_time = False
+        
+        # Level start countdown
+        show_level_start = True
+        level_start_timer = 3.0  # 3 seconds countdown
+        game_timer_started = False
         
         # Wave completion message display
         wave_message = ""
@@ -167,6 +172,11 @@ class Game:
         # Set kill callback for level
         level.set_kill_callback(on_enemy_killed)
         
+        # 开始游戏时播放游戏音乐（无敌人状态）
+        audio_manager.play_game_music()
+        # 初始化敌人数量为0
+        audio_manager.update_enemy_count(0)
+        
         # Toolbar settings will be dynamically calculated in draw_enhanced_toolbar
         
         running = True
@@ -184,8 +194,16 @@ class Game:
             if should_update_ui:
                 ui_update_timer = 0.0
             
-            # Update game time if game is running
-            if not game_over and not game_won:
+            # Handle level start countdown
+            if show_level_start:
+                level_start_timer -= dt
+                if level_start_timer <= 0:
+                    show_level_start = False
+                    start_time = time.time()  # Start timing now
+                    game_timer_started = True
+            
+            # Update game time if game is running and timer has started
+            if not game_over and not game_won and game_timer_started and start_time:
                 current_game_time = time.time() - start_time
             
             for ev in pygame.event.get():
@@ -212,8 +230,8 @@ class Game:
                     if menu_button_rect.collidepoint(mx, my):
                         return "menu"
 
-                    # Allow interaction only if the game is not over
-                    if not game_over and not game_won:
+                    # Allow interaction only if the game is not over and level start is complete
+                    if not game_over and not game_won and not show_level_start:
                         # Check UI area click
                         if my < UI_HEIGHT:
                             # Get toolbar button info
@@ -264,8 +282,8 @@ class Game:
                                         towers.add(TowerFactory.create_tower(sel, gx, gy))
                                         sel = None
 
-            # Update game logic only if the game is not over
-            if not game_over and not game_won:
+            # Update game logic only if the game is not over and level start is complete
+            if not game_over and not game_won and not show_level_start:
                 # Store previous wave state to detect completion
                 prev_wave_complete = level.wave_complete
                 prev_wave = level.current_wave
@@ -277,6 +295,10 @@ class Game:
                 bullets.update(dt)
                 towers.update(dt, level.enemies, bullets)
                 
+                # Update audio manager with enemy count for music switching
+                enemy_count = len(level.enemies)
+                audio_manager.update_enemy_count(enemy_count)
+                
                 # Check if enemies have reached the end and trigger HOME hit animation
                 for e in list(level.enemies):
                     # Check new version enemy's end reached logic
@@ -284,6 +306,8 @@ class Game:
                         # Trigger HOME hit animation before removing enemy
                         game_map.on_home_hit()
                         level.base_hp -= 1
+                        # Play home hit sound
+                        audio_manager.play_home_hit_sound()
                         # Clean up speed modifiers
                         if hasattr(e, 'cleanup_speed_modifiers'):
                             e.cleanup_speed_modifiers()
@@ -294,6 +318,8 @@ class Game:
                         # Trigger HOME hit animation before removing enemy
                         game_map.on_home_hit()
                         level.base_hp -= getattr(e, 'damage_to_base', 1)
+                        # Play home hit sound
+                        audio_manager.play_home_hit_sound()
                         # Clean up speed modifiers
                         if hasattr(e, 'cleanup_speed_modifiers'):
                             e.cleanup_speed_modifiers()
@@ -307,15 +333,22 @@ class Game:
                     wave_message = f"Wave {level.current_wave} Complete! Bonus: +${WAVE_REWARD}"
                     wave_message_timer = 0.0
                     print(f"Wave {level.current_wave} completed! Bonus: +${WAVE_REWARD}")
+                    # Play wave complete sound
+                    audio_manager.play_wave_complete_sound()
                 
                 # Check game over condition
                 if level.base_hp <= 0:
                     game_over = True
+                    # Stop all audio first, then play game over sound
+                    audio_manager.stop_all_audio()
+                    audio_manager.play_game_over_sound()
                 
                 # Check victory condition - all waves complete
                 if level.all_waves_complete:
                     game_won = True
                     final_time = current_game_time
+                    # Play victory sound
+                    audio_manager.play_victory_sound()
                     
                     # Check if this is a new best time
                     if level.best_time is None or final_time < level.best_time:
@@ -358,6 +391,10 @@ class Game:
             # Draw wave completion message if active
             if wave_message:
                 self.draw_wave_message(current_screen, current_screen_size, wave_message)
+            
+            # Draw level start message if active
+            if show_level_start:
+                self.draw_level_start_message(current_screen, current_screen_size, level.initial_money, level_start_timer)
             
             # Draw game over screen if applicable
             if game_over:
@@ -596,32 +633,63 @@ class Game:
         refund_y = demolish_rect.y + demolish_rect.height - 14
         screen.blit(refund_text, (refund_x, refund_y))
         
-        # Info panel - adjusted position with larger text
-        info_panel_x = screen_w - 240  # Increase width for larger text
-        info_panel_w = 220
-        info_panel_rect = pygame.Rect(info_panel_x, 15, info_panel_w, UI_HEIGHT - 30)
+        # Enhanced Info panel - Right side status display
+        info_panel_x = screen_w - 280
+        info_panel_w = 260
+        info_panel_h = UI_HEIGHT - 20
+        info_panel_rect = pygame.Rect(info_panel_x, 10, info_panel_w, info_panel_h)
         
-        # Info panel background
-        pygame.draw.rect(screen, CREAM, info_panel_rect, border_radius=10)
-        pygame.draw.rect(screen, BROWN, info_panel_rect, 3, border_radius=10)
+        # Beautiful info panel background with nature theme
+        # Gradient background - darker at top, lighter at bottom
+        for i in range(info_panel_h):
+            color_progress = i / info_panel_h
+            r = int(34 + (144 - 34) * color_progress)    # From dark green to light green
+            g = int(100 + (158 - 100) * color_progress)  # From dark green to light green
+            b = int(34 + (44 - 34) * color_progress)     # From dark green to light green
+            pygame.draw.line(screen, (r, g, b), 
+                           (info_panel_x, 10 + i), 
+                           (info_panel_x + info_panel_w, 10 + i))
         
-        # Info text function with larger font
-        def draw_info_text(text, color, x, y, font=FONTS['small']):  # Changed from 'tiny' to 'small'
-            shadow_text = font.render(text, True, (0, 0, 0, 100))
-            screen.blit(shadow_text, (x + 1, y + 1))
-            text_surface = font.render(text, True, color)
-            screen.blit(text_surface, (x, y))
+        # Elegant border with rounded corners
+        pygame.draw.rect(screen, (245, 245, 220, 200), info_panel_rect, border_radius=15)
+        pygame.draw.rect(screen, (139, 115, 85), info_panel_rect, 3, border_radius=15)
         
-        # Money display with larger font
-        money_color = FOREST_GREEN if money >= 50 else (180, 120, 60)
-        draw_info_text(f"Money: ${money}", money_color, info_panel_x + 15, 30)
+        # Inner glow effect
+        inner_rect = pygame.Rect(info_panel_x + 3, 13, info_panel_w - 6, info_panel_h - 6)
+        pygame.draw.rect(screen, (255, 255, 255, 60), inner_rect, 2, border_radius=12)
         
-        # Base health with larger font
-        hp_color = FOREST_GREEN if base_hp > 5 else (200, 100, 100)
-        draw_info_text(f"Base HP: {base_hp}", hp_color, info_panel_x + 15, 55)
+        # Status icons and text with better spacing
+        def draw_status_item(icon_color, label, value, value_color, y_offset):
+            icon_x = info_panel_x + 20
+            icon_y = 25 + y_offset
+            text_x = info_panel_x + 50
+            
+            # Draw icon background circle (no text inside)
+            pygame.draw.circle(screen, icon_color, (icon_x, icon_y), 12)
+            pygame.draw.circle(screen, (255, 255, 255, 100), (icon_x, icon_y), 12, 2)
+            
+            # Draw label and value with shadow
+            shadow_offset = 1
+            label_text = f"{label}: {value}"
+            
+            # Shadow
+            shadow_surface = FONTS['small'].render(label_text, True, (0, 0, 0, 120))
+            screen.blit(shadow_surface, (text_x + shadow_offset, icon_y - 8 + shadow_offset))
+            
+            # Main text
+            text_surface = FONTS['small'].render(label_text, True, value_color)
+            screen.blit(text_surface, (text_x, icon_y - 8))
         
-        # Level name with larger font
-        draw_info_text(f"Level: {level_name}", DARK_GREEN, info_panel_x + 15, 80)
+        # Money status
+        money_color = (34, 139, 34) if money >= 50 else (184, 134, 11)
+        draw_status_item((255, 215, 0), "Gold", f"{money}", money_color, 0)
+        
+        # Base health status  
+        hp_color = (34, 139, 34) if base_hp > 5 else (220, 20, 60)
+        draw_status_item((220, 20, 60), "Base HP", f"{base_hp}", hp_color, 30)
+        
+        # Level name status
+        draw_status_item((70, 130, 180), "Level", level_name, (25, 25, 112), 60)
         
         # Menu button - moved to bottom right corner
         menu_button_rect = pygame.Rect(screen_w - 100, screen_h - 60, 80, 40)
@@ -808,66 +876,124 @@ class Game:
         screen.blit(instruction, (screen_w // 2 - instruction_size[0] // 2, instruction_y))
 
     def draw_wave_panel_with_timing(self, screen, screen_size, level, current_game_time):
-        """Draw simplified wave panel"""
+        """Draw beautiful wave panel with forest theme"""
         screen_w, screen_h = screen_size
         
         # Calculate content
         wave_text = f"Wave {level.current_wave}/{level.total_waves}"
         time_text = f"Time: {current_game_time:.1f}s"
         
-        # Status text
+        # Status text and color determination
         if level.in_preparation and not level.first_wave_started:
-            # Show preparation countdown
             time_left = level.preparation_time - level.preparation_timer
-            status_text = f"First wave in: {time_left:.1f}s"
-            status_color = (255, 100, 100)  # Red color for preparation countdown
+            status_text = f"First wave starts in {time_left:.1f}s"
+            status_color = (255, 165, 0)  # Orange for preparation
+
         elif level.in_wave_break and not level.all_waves_complete:
             time_left = level.wave_break_duration - level.wave_break_timer
-            status_text = f"Next wave in: {time_left:.1f}s"
-            status_color = (255, 220, 100)
+            status_text = f"Next wave arrives in {time_left:.1f}s"
+            status_color = (255, 215, 0)  # Gold for break
+
         elif not level.all_waves_complete:
             living_enemies = len([e for e in level.enemies if hasattr(e, 'health') and e.health > 0])
-            status_text = f"Enemies: {level.enemies_spawned_this_wave}/{level.enemies_in_wave} (Active: {living_enemies})"
-            status_color = (180, 220, 255)
+            status_text = f"Enemies: {level.enemies_spawned_this_wave}/{level.enemies_in_wave} | Active: {living_enemies}"
+            status_color = (64, 224, 208)  # Turquoise for active combat
+
         else:
-            status_text = "All waves complete!"
-            status_color = (150, 255, 150)
+            status_text = "All waves completed!"
+            status_color = (50, 205, 50)  # Lime green for completion
+
         
-        # Calculate panel size
-        texts = [wave_text, status_text, time_text]
-        max_width = max(FONTS['button'].size(wave_text)[0], 
-                       FONTS['small'].size(status_text)[0], 
-                       FONTS['small'].size(time_text)[0])
+        # Optimized panel sizing
+        panel_w = 380
+        panel_h = 100
+        panel_x = 25
+        panel_y = screen_h - panel_h - 25
         
-        panel_w = max_width + 50
-        panel_h = 110
-        panel_x = 20
-        panel_y = screen_h - panel_h - 20
+        # Beautiful gradient background
+        panel_surface = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
         
-        # Simple background
-        pygame.draw.rect(screen, (25, 35, 45, 240), (panel_x, panel_y, panel_w, panel_h), border_radius=12)
-        pygame.draw.rect(screen, (120, 200, 255), (panel_x, panel_y, panel_w, panel_h), 3, border_radius=12)
+        # Multi-layer gradient for depth
+        for i in range(panel_h):
+            progress = i / panel_h
+            # Forest theme gradient: dark forest green to lighter woodland green
+            r = int(25 + (45 - 25) * progress)
+            g = int(60 + (80 - 60) * progress) 
+            b = int(25 + (35 - 25) * progress)
+            alpha = int(240 - 20 * progress)
+            
+            color = (r, g, b, alpha)
+            pygame.draw.line(panel_surface, color, (0, i), (panel_w, i))
         
-        # Text with simple shadows
-        def draw_simple_text(text, font, color, x, y):
-            shadow_text = font.render(text, True, (0, 0, 0))
-            screen.blit(shadow_text, (x + 1, y + 1))
-            main_text = font.render(text, True, color)
-            screen.blit(main_text, (x, y))
+        screen.blit(panel_surface, (panel_x, panel_y))
         
-        text_x = panel_x + 25
+        # Elegant frame and inner highlight
+        frame_color = (139, 115, 85)  # Woodland brown
+        pygame.draw.rect(screen, frame_color, (panel_x, panel_y, panel_w, panel_h), 4, border_radius=15)
         
-        # Wave title
-        wave_y = panel_y + 15
-        draw_simple_text(wave_text, FONTS['button'], (180, 220, 255), text_x, wave_y)
+        # Inner glow
+        inner_glow_rect = (panel_x + 3, panel_y + 3, panel_w - 6, panel_h - 6)
+        pygame.draw.rect(screen, (255, 255, 255, 80), inner_glow_rect, 2, border_radius=12)
+        
+        # Enhanced text rendering with shadows and better positioning
+        def draw_enhanced_text(text, font, color, x, y, shadow_color=(0, 0, 0), shadow_offset=2):
+            # Enhanced shadow
+            shadow_surface = font.render(text, True, shadow_color)
+            screen.blit(shadow_surface, (x + shadow_offset, y + shadow_offset))
+            
+            # Main text
+            text_surface = font.render(text, True, color)
+            screen.blit(text_surface, (x, y))
+            return text_surface
+        
+        # Wave title with large font
+        wave_title_x = panel_x + 20
+        wave_title_y = panel_y + 15
+        draw_enhanced_text(wave_text, FONTS['button'], (255, 255, 240), wave_title_x, wave_title_y)
+        
+        # Status section with indicator circles (no emoji)
+        status_x = panel_x + 20
+        status_y = panel_y + 45
+        
+        # Status indicator circle
+        indicator_x = status_x
+        indicator_y = status_y + 8
+        
+        # Draw status indicator based on current state
+        if level.in_preparation and not level.first_wave_started:
+            # Preparation indicator - pulsing orange circle
+            pulse = int(128 + 127 * abs(math.sin(pygame.time.get_ticks() / 300)))
+            pygame.draw.circle(screen, (255, pulse, 0), (indicator_x, indicator_y), 6)
+        elif level.in_wave_break:
+            # Break indicator - steady yellow circle
+            pygame.draw.circle(screen, (255, 215, 0), (indicator_x, indicator_y), 6)
+        elif not level.all_waves_complete:
+            # Combat indicator - pulsing red circle
+            pulse = int(128 + 127 * abs(math.sin(pygame.time.get_ticks() / 200)))
+            pygame.draw.circle(screen, (pulse, 64, 64), (indicator_x, indicator_y), 6)
+        else:
+            # Complete indicator - steady green circle
+            pygame.draw.circle(screen, (50, 205, 50), (indicator_x, indicator_y), 6)
+        
+        # White border for indicator
+        pygame.draw.circle(screen, (255, 255, 255), (indicator_x, indicator_y), 6, 2)
         
         # Status text
-        status_y = panel_y + 45
-        draw_simple_text(status_text, FONTS['small'], status_color, text_x, status_y)
+        status_text_x = status_x + 20
+        draw_enhanced_text(status_text, FONTS['small'], status_color, status_text_x, status_y)
+        
+        # Time display
+        time_x = panel_x + 20
+        time_y = panel_y + 70
+        
+        # Time indicator circle
+        time_indicator_color = (100, 149, 237)  # Cornflower blue
+        pygame.draw.circle(screen, time_indicator_color, (time_x, time_y + 8), 6)
+        pygame.draw.circle(screen, (255, 255, 255), (time_x, time_y + 8), 6, 2)
         
         # Time text
-        time_y = panel_y + 75
-        draw_simple_text(time_text, FONTS['small'], (255, 220, 120), text_x, time_y)
+        time_text_x = time_x + 20
+        draw_enhanced_text(time_text, FONTS['small'], (173, 216, 230), time_text_x, time_y)
 
     def draw_victory_screen(self, screen, screen_size, current_game_time, best_time, is_new_best_time):
         """Draw elegant victory screen with sophisticated golden effects"""
@@ -1073,6 +1199,69 @@ class Game:
         # Instructions with elegant fade
         instruction_alpha = int(220 + 35 * math.sin(time_factor * 2))
         draw_luxury_text(instruction_text, FONTS['button'], (255, 245, 220), screen_w // 2, content_y)
+
+    def draw_level_start_message(self, screen, screen_size, initial_money, countdown_time):
+        """Draw level start countdown message"""
+        screen_w, screen_h = screen_size
+        
+        # Message content
+        main_text = "Level Starting!"
+        countdown_text = f"First wave arrives in 10 seconds"
+        money_text = f"Initial Gold: ${initial_money}"
+        timer_text = f"Get ready... {countdown_time:.1f}s"
+        
+        # Calculate panel dimensions
+        texts = [main_text, countdown_text, money_text, timer_text]
+        text_widths = [FONTS['title'].size(main_text)[0],
+                      FONTS['hud'].size(countdown_text)[0],
+                      FONTS['hud'].size(money_text)[0],
+                      FONTS['button'].size(timer_text)[0]]
+        
+        max_width = max(text_widths)
+        panel_w = max_width + 120
+        panel_h = 220
+        panel_x = (screen_w - panel_w) // 2
+        panel_y = (screen_h - panel_h) // 2 - 50
+        
+        # Background overlay
+        overlay = pygame.Surface((screen_w, screen_h), pygame.SRCALPHA)
+        overlay.fill((10, 50, 10, 120))
+        screen.blit(overlay, (0, 0))
+        
+        # Panel background with forest theme gradient
+        panel_surface = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
+        for i in range(panel_h):
+            progress = i / panel_h
+            r = int(40 + (70 - 40) * progress)
+            g = int(80 + (120 - 80) * progress)
+            b = int(40 + (50 - 40) * progress)
+            alpha = int(240 - 20 * progress)
+            color = (r, g, b, alpha)
+            pygame.draw.line(panel_surface, color, (0, i), (panel_w, i))
+        
+        screen.blit(panel_surface, (panel_x, panel_y))
+        
+        # Panel border
+        pygame.draw.rect(screen, (139, 115, 85), (panel_x, panel_y, panel_w, panel_h), 4, border_radius=20)
+        pygame.draw.rect(screen, (255, 255, 255, 100), (panel_x + 3, panel_y + 3, panel_w - 6, panel_h - 6), 2, border_radius=17)
+        
+        # Enhanced text drawing function
+        def draw_message_text(text, font, color, y_pos, center_x=panel_x + panel_w // 2):
+            # Shadow
+            shadow_text = font.render(text, True, (0, 0, 0))
+            shadow_rect = shadow_text.get_rect(center=(center_x + 2, y_pos + 2))
+            screen.blit(shadow_text, shadow_rect)
+            
+            # Main text
+            text_surface = font.render(text, True, color)
+            text_rect = text_surface.get_rect(center=(center_x, y_pos))
+            screen.blit(text_surface, text_rect)
+        
+        # Draw texts with proper spacing
+        draw_message_text(main_text, FONTS['title'], (255, 255, 240), panel_y + 50)
+        draw_message_text(countdown_text, FONTS['hud'], (255, 165, 0), panel_y + 100)
+        draw_message_text(money_text, FONTS['hud'], (255, 215, 0), panel_y + 130)
+        draw_message_text(timer_text, FONTS['button'], (144, 238, 144), panel_y + 170)
 
     def run(self):
         while True:

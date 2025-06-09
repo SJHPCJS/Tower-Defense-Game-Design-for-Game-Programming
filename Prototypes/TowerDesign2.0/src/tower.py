@@ -3,6 +3,7 @@ import os
 import math
 from settings import *
 from bullet import BulletFactory
+from audio_manager import audio_manager
 
 class TowerSprite:
     """Handles tower sprite loading and animation"""
@@ -137,6 +138,9 @@ class BaseTower(pygame.sprite.Sprite):
         self.is_attacking = False
         self.attack_timer = 0.0
         
+        # First enemy detection sound flag
+        self.has_played_detect_sound = False
+        
         # Load sprite
         self.sprite = TowerSprite(self.name)
         
@@ -225,6 +229,14 @@ class AttackingTower(BaseTower):
         nearest = min(enemies,
                       key=lambda e:(cx-e.rect.centerx)**2+(cy-e.rect.centery)**2)
         if (cx-nearest.rect.centerx)**2 + (cy-nearest.rect.centery)**2 <= scaled_range**2:
+            # Play first enemy detection sound
+            if not self.has_played_detect_sound:
+                if self.name == "Banana Blaster":
+                    audio_manager.play_banana_detect_sound()
+                elif self.name == "Wood Sage":
+                    audio_manager.play_wood_sage_detect_sound()
+                self.has_played_detect_sound = True
+            
             bullet = BulletFactory.create_bullet(self.name, self.rect.center, nearest, self.damage, enemies)
             bullets.add(bullet)
             self.cool = self.rof

@@ -2,6 +2,7 @@ import pygame
 import math
 from abc import ABC, abstractmethod
 from settings import *
+from audio_manager import audio_manager
 
 
 class DamageEffect(ABC):
@@ -48,6 +49,9 @@ class BurnDamageEffect(DamageEffect):
         # Add new burn effect
         burn_effect = BurnEffect(enemy.rect.center)
         enemy.burn_effects.append(burn_effect)
+        
+        # Play flame sound effect
+        audio_manager.play_flame_sound()
 
 
 class ElectricDamageEffect(DamageEffect):
@@ -83,6 +87,9 @@ class ElectricDamageEffect(DamageEffect):
         
         electric_effect = ElectricEffect(enemy.rect.center)
         enemy.electric_effects.append(electric_effect)
+        
+        # Play death (lightning) sound effect
+        audio_manager.play_death_sound()
     
     def _apply_chain_damage(self, primary_enemy, chain_damage, position):
         """Apply chain damage to nearby enemies"""
@@ -109,6 +116,9 @@ class ElectricDamageEffect(DamageEffect):
                     
                     electric_effect = ElectricEffect(enemy.rect.center)
                     enemy.electric_effects.append(electric_effect)
+                    
+                    # Play death sound for chain damage too
+                    audio_manager.play_death_sound()
 
 
 class BurnEffect:

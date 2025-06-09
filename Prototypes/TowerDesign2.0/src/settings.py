@@ -56,14 +56,14 @@ UI_DANGER = (220, 53, 69)
 # Game settings
 STARTING_MONEY = 200
 TOWER_COSTS = {
-    'Emberwing': 25,
-    'Volt Cow': 25,
-    'Banana Blaster': 20,
-    'Wood Sage': 15,
-    'Chrono Cactus': 25
+    'Emberwing': 45,
+    'Volt Cow': 45,
+    'Banana Blaster': 40,
+    'Wood Sage': 20,
+    'Chrono Cactus': 45
 }
-WAVE_REWARD = 80
-KILL_REWARD = 2
+WAVE_REWARD = 50
+KILL_REWARD = 0
 
 # Enemy colors
 ENEMY_COLORS = {
