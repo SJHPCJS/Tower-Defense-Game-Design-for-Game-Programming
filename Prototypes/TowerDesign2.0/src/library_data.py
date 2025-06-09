@@ -1,5 +1,5 @@
 # Character Library Data Configuration
-# English version for professional presentation
+# English version with enhanced nature vs urbanization theme
 
 # Character Categories - Forest Alliance vs City Invaders
 TOWERS = ["Emberwing", "Volt Cow", "Banana Blaster", "Wood Sage", "Chrono Cactus"]
@@ -7,15 +7,15 @@ ENEMIES = ["Wiregeist", "Boxshot", "Adframe", "Caffeinj", "Cementum"]
 
 # Complete Character Library Data
 LIBRARY_DATA = {
-    # === Forest Alliance - Allied Spirits ===
+    # === Forest Alliance - Nature Guardians ===
     "HOME": {
-        "name": "Forest Spirit",
+        "name": "Forest Heart",
         "faction": "ally",
-        "story": """FOREST GUARDIAN - ALLIED SPIRIT
+        "story": """NATURE SANCTUARY - FOREST GUARDIAN
 
-The ancient heart of the forest, awakened to defend against the mechanical invasion from the city. This mystical entity serves as the last bastion of natural magic, channeling the forest's life force to protect all woodland creatures.
+The ancient life core of the forest, awakened to resist the mechanical invasion from the city. This mystical entity serves as the last bastion of natural magic, channeling the forest's life force to protect all woodland creatures.
 
-When enemies approach, the Forest Spirit glows with protective energy. Its very presence strengthens nearby forest defenders and provides sanctuary for all who fight to preserve nature's balance.""",
+When enemies approach, the Forest Heart glows with protective energy. Its presence strengthens nearby forest defenders and provides sanctuary for all who fight to preserve nature's balance.""",
         "stats": {
             "Type": "Base Structure",
             "Faction": "Forest Alliance",
@@ -30,14 +30,14 @@ When enemies approach, the Forest Spirit glows with protective energy. Its very 
     "Emberwing": {
         "name": "Emberwing",
         "faction": "ally",
-        "story": """FLAME GUARDIAN - ALLIED SPIRIT
+        "story": """FLAME GUARDIAN - FOREST PROTECTOR
 
-A majestic fire spirit that soars through the forest canopy, wielding ancient flames to incinerate mechanical invaders. Born from the sacred fire groves, Emberwing serves as the forest's primary ranged defender.
+A majestic fire spirit soaring through forest canopies, wielding ancient flames to incinerate mechanical invaders. Born from sacred fire groves, Emberwing serves as the forest's primary ranged defender.
 
-This aerial guardian launches concentrated fire projectiles that deal significant damage to armored enemies. Its flames burn with the pure essence of nature, making it especially effective against synthetic materials and robotic constructs.""",
+This aerial guardian launches concentrated fire projectiles that deal massive damage to armored enemies. Its flames burn with pure natural essence, making it especially effective against synthetic materials and robotic constructs.""",
         "stats": {
             "Damage": "45",
-            "Rate of Fire": "0.9 sec",
+            "Attack Rate": "0.9 sec",
             "Range": "Medium",
             "Faction": "Forest Alliance", 
             "Cost": "$25",
@@ -50,14 +50,14 @@ This aerial guardian launches concentrated fire projectiles that deal significan
     "Volt Cow": {
         "name": "Volt Cow", 
         "faction": "ally",
-        "story": """THUNDER BEAST - ALLIED SPIRIT
+        "story": """THUNDER BEAST - FOREST PROTECTOR
 
 A powerful bovine spirit infused with lightning magic, standing as the forest's heavy artillery. Once a peaceful meadow guardian, Volt Cow has channeled storm energy to become a formidable defender against technological threats.
 
-This electrified protector generates devastating electrical attacks that can overload electronic systems and disable multiple enemies simultaneously. Its thunder strikes echo through the forest, warning all invaders of nature's wrath.""",
+This electrified protector generates devastating electrical attacks that overload electronic systems and disable multiple enemies simultaneously. Its thunder echoes through the forest, warning all invaders of nature's wrath.""",
         "stats": {
             "Damage": "65", 
-            "Rate of Fire": "1.2 sec",
+            "Attack Rate": "1.2 sec",
             "Range": "Long",
             "Faction": "Forest Alliance",
             "Cost": "$25",
@@ -70,14 +70,14 @@ This electrified protector generates devastating electrical attacks that can ove
     "Banana Blaster": {
         "name": "Banana Blaster",
         "faction": "ally",
-        "story": """RAPID DEFENDER - ALLIED SPIRIT
+        "story": """RAPID DEFENDER - FOREST PROTECTOR
 
-A quirky yet effective forest defender that harnesses the power of tropical fruits. This enthusiastic guardian launches rapid-fire banana projectiles with surprising accuracy and speed.
+A quirky yet effective forest defender that harnesses tropical fruit power. This enthusiastic guardian launches rapid-fire banana projectiles with surprising accuracy and speed.
 
-Despite its playful appearance, the Banana Blaster is a serious threat to fast-moving enemies. Its high rate of fire makes it perfect for intercepting quick scouts and overwhelming groups of weaker invaders with a constant barrage of organic ammunition.""",
+Despite its playful appearance, Banana Blaster poses a serious threat to fast-moving enemies. Its high fire rate makes it perfect for intercepting quick scouts and overwhelming weaker invader groups with constant organic ammunition barrages.""",
         "stats": {
             "Damage": "25",
-            "Rate of Fire": "0.3 sec", 
+            "Attack Rate": "0.3 sec", 
             "Range": "Medium",
             "Faction": "Forest Alliance",
             "Cost": "$20",
@@ -90,14 +90,14 @@ Despite its playful appearance, the Banana Blaster is a serious threat to fast-m
     "Wood Sage": {
         "name": "Wood Sage",
         "faction": "ally",
-        "story": """NATURE MYSTIC - ALLIED SPIRIT
+        "story": """NATURE MYSTIC - FOREST PROTECTOR
 
-An ancient tree spirit versed in the deep magic of the forest. The Wood Sage channels centuries of wisdom and natural energy to protect the woodland realm from artificial corruption.
+An ancient tree spirit versed in the deep magic of the forest. Wood Sage channels centuries of wisdom and natural energy to protect the woodland realm from artificial corruption.
 
-This wise defender combines solid damage output with natural resilience. Its root network allows it to draw power directly from the earth, making it a reliable and cost-effective guardian that embodies the enduring strength of nature.""",
+This wise defender combines solid damage output with natural resilience. Its root network draws power directly from the earth, making it a reliable and cost-effective guardian embodying nature's enduring strength.""",
         "stats": {
             "Damage": "35",
-            "Rate of Fire": "0.8 sec",
+            "Attack Rate": "0.8 sec",
             "Range": "Medium", 
             "Faction": "Forest Alliance",
             "Cost": "$15",
@@ -110,11 +110,11 @@ This wise defender combines solid damage output with natural resilience. Its roo
     "Chrono Cactus": {
         "name": "Chrono Cactus",
         "faction": "ally",
-        "story": """TIME WARDEN - ALLIED SPIRIT
+        "story": """TIME WARDEN - FOREST PROTECTOR
 
-A mystical desert spirit that has mastered temporal magic to aid the forest's defense. This spiny guardian doesn't deal direct damage but instead manipulates time itself to hinder enemy advances.
+A mystical desert spirit that has mastered temporal magic to aid forest defense. This spiny guardian doesn't deal direct damage but manipulates time itself to hinder enemy advances.
 
-The Chrono Cactus creates temporal distortion fields that slow all nearby enemies by 25%. Its strategic value is immense, giving other defenders more time to eliminate threats and creating tactical advantages across the battlefield.""",
+Chrono Cactus creates temporal distortion fields that slow all nearby enemies by 25%. Its strategic value is immense, giving other defenders more time to eliminate threats and creating tactical advantages across the battlefield.""",
         "stats": {
             "Damage": "0 (Support)",
             "Slow Effect": "25%",
@@ -127,22 +127,22 @@ The Chrono Cactus creates temporal distortion fields that slow all nearby enemie
         "portrait_path": "assets/library/tower/Chrono Cactus.png"
     },
     
-    # === City Invaders - Enemy Forces ===
+    # === City Invaders - Urban Forces ===
     "Wiregeist": {
         "name": "Wiregeist",
         "faction": "enemy",
         "story": """ELECTRICAL PHANTOM - CITY INVADER
 
-A malevolent spirit born from discarded electronics and urban electromagnetic pollution. This ghostly entity leads the technological assault against the natural world, seeking to corrupt all organic life with digital chaos.
+A malevolent spirit born from discarded electronics and urban electromagnetic pollution. This ghostly entity leads technological assault against the natural world, seeking to corrupt all organic life with digital chaos.
 
-Fast and elusive, the Wiregeist phases through organic defenses while maintaining deadly electrical attacks. Its presence destabilizes the natural order, making it a priority target for forest defenders.""",
+Fast and elusive, Wiregeist phases through organic defenses while maintaining deadly electrical attacks. Its presence destabilizes natural order, making it a priority target for forest defenders.""",
         "stats": {
-            "Health": "Medium",
-            "Speed": "Fast", 
+            "Health": "140",
+            "Speed": "55", 
             "Faction": "City Invaders",
-            "Reward": "$4",
-            "Damage to Base": "1 HP",
-            "Ability": "Electrical interference"
+            "Kill Reward": "$4",
+            "Base Damage": "1 HP",
+            "Special Ability": "Aura: +20% speed to nearby enemies"
         },
         "sprite_path": "assets/sprite/enemy/wiregeist.png",
         "portrait_path": "assets/library/enemy/Wiregeist.png"
@@ -153,16 +153,16 @@ Fast and elusive, the Wiregeist phases through organic defenses while maintainin
         "faction": "enemy",
         "story": """DELIVERY DRONE - CITY INVADER
 
-An autonomous delivery bot reprogrammed for invasion. These mass-produced units flood the forest with their sheer numbers, carrying packages of urban pollution and synthetic materials.
+An autonomous delivery bot reprogrammed for invasion. These mass-produced units flood the forest with sheer numbers, carrying packages of urban pollution and synthetic materials.
 
-Moderate in strength and speed, Boxshots represent the relentless march of commercialization. They methodically advance through natural barriers, delivering their toxic cargo to contaminate pristine wilderness areas.""",
+Moderate in strength and speed, Boxshots represent the relentless march of commercialization. They methodically advance through natural barriers, delivering toxic cargo to contaminate pristine wilderness areas.""",
         "stats": {
-            "Health": "Medium",
-            "Speed": "Medium",
+            "Health": "160",
+            "Speed": "50",
             "Faction": "City Invaders", 
-            "Reward": "$3",
-            "Damage to Base": "1 HP",
-            "Ability": "Steady advance"
+            "Kill Reward": "$2",
+            "Base Damage": "1 HP",
+            "Special Ability": "Steady advance"
         },
         "sprite_path": "assets/sprite/enemy/boxshot.png",
         "portrait_path": "assets/library/enemy/Boxshot.png"
@@ -177,12 +177,12 @@ A walking advertisement display designed to spread urban ideology and consumer c
 
 Quick and persistent, Adframes use psychological warfare alongside physical invasion. Their bright displays and constant advertising noise pollute the peaceful forest atmosphere, making them particularly disruptive enemies.""",
         "stats": {
-            "Health": "Low-Medium", 
-            "Speed": "Fast",
+            "Health": "200", 
+            "Speed": "50",
             "Faction": "City Invaders",
-            "Reward": "$3",
-            "Damage to Base": "1 HP",
-            "Ability": "Distraction tactics"
+            "Kill Reward": "$3",
+            "Base Damage": "1 HP",
+            "Special Ability": "30% dodge chance"
         },
         "sprite_path": "assets/sprite/enemy/adframe.png",
         "portrait_path": "assets/library/enemy/Adframe.png"
@@ -195,14 +195,14 @@ Quick and persistent, Adframes use psychological warfare alongside physical inva
 
 An over-caffeinated reconnaissance unit powered by concentrated urban stimulants. These jittery scouts zip through the forest at incredible speeds, mapping weak points in natural defenses.
 
-Extremely fast but fragile, Caffeinj units rely on speed and unpredictable movement patterns. Their hyperactive behavior makes them difficult to track, and they often slip past slower defensive measures.""",
+Extremely fast but fragile, Caffeinj units rely on speed and unpredictable movement patterns. Their hyperactive behavior makes them difficult to track, often slipping past slower defensive measures.""",
         "stats": {
-            "Health": "Low",
-            "Speed": "Very Fast",
+            "Health": "120",
+            "Speed": "90",
             "Faction": "City Invaders",
-            "Reward": "$2", 
-            "Damage to Base": "1 HP",
-            "Ability": "Erratic movement"
+            "Kill Reward": "$2", 
+            "Base Damage": "1 HP",
+            "Special Ability": "Ultra-fast movement, erratic path"
         },
         "sprite_path": "assets/sprite/enemy/caffeinj.png",
         "portrait_path": "assets/library/enemy/Caffeinj.png"
@@ -215,14 +215,14 @@ Extremely fast but fragile, Caffeinj units rely on speed and unpredictable movem
 
 A massive construction mech designed to pave over natural landscapes and erect concrete structures. These heavily armored units represent the ultimate goal of urban expansion - total environmental transformation.
 
-Slow but incredibly durable, Cementum units absorb enormous amounts of damage while steadily advancing. Each step leaves behind concrete residue, permanently altering the forest floor and threatening to turn green spaces into urban wastelands.""",
+Slow but incredibly durable, Cementum units absorb enormous damage while steadily advancing. Each step leaves concrete residue, permanently altering the forest floor and threatening to turn green spaces into urban wastelands.""",
         "stats": {
-            "Health": "Very High",
-            "Speed": "Slow", 
+            "Health": "400",
+            "Speed": "30", 
             "Faction": "City Invaders",
-            "Reward": "$5",
-            "Damage to Base": "2 HP",
-            "Ability": "Heavy armor, terrain modification"
+            "Kill Reward": "$5",
+            "Base Damage": "2 HP",
+            "Special Ability": "Heavy armor, terrain modification"
         },
         "sprite_path": "assets/sprite/enemy/cementum.png",
         "portrait_path": "assets/library/enemy/Cementum.png"

@@ -54,13 +54,15 @@ class Level:
             self.initial_money = settings.get('initial_money', STARTING_MONEY)
             self.total_waves = settings.get('wave_count', 5)
             self.enemy_speed = settings.get('enemy_speed', 50)
+            self.base_hp = settings.get('base_hp', 10)  # load custom base_hp
             self.best_time = settings.get('best_time', None)
-            print(f"Level settings: Money=${self.initial_money}, Waves={self.total_waves}, Speed={self.enemy_speed}")
+            print(f"Level settings: Money=${self.initial_money}, Waves={self.total_waves}, Speed={self.enemy_speed}, Base HP={self.base_hp}")
         else:
             # Default settings for backward compatibility
             self.initial_money = STARTING_MONEY
             self.total_waves = 5
             self.enemy_speed = 50
+            self.base_hp = 10  # default base_hp
             self.best_time = None
     
     def recalculate_path(self):

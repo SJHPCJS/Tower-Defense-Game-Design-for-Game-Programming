@@ -212,7 +212,12 @@ class AttackingTower(BaseTower):
     def update(self, dt, enemies, bullets):
         super().update(dt, enemies, bullets)
         
-        if self.cool > 0 or not enemies:
+        if not enemies:
+            # No enemies anywhere, reset detection sound flag
+            self.has_played_detect_sound = False
+            return
+            
+        if self.cool > 0:
             return
             
         cx, cy = self.rect.center
@@ -226,21 +231,27 @@ class AttackingTower(BaseTower):
         else:
             scaled_range = self.RANGE
         
-        nearest = min(enemies,
-                      key=lambda e:(cx-e.rect.centerx)**2+(cy-e.rect.centery)**2)
+        # Find nearest enemy
+        nearest = min(enemies, key=lambda e:(cx-e.rect.centerx)**2+(cy-e.rect.centery)**2)
+        
+        # Check if nearest enemy is in range
         if (cx-nearest.rect.centerx)**2 + (cy-nearest.rect.centery)**2 <= scaled_range**2:
-            # Play first enemy detection sound
-            if not self.has_played_detect_sound:
+            # Play first enemy detection sound for detection towers
+            if not self.has_played_detect_sound and (self.name == "Banana Blaster" or self.name == "Wood Sage"):
                 if self.name == "Banana Blaster":
                     audio_manager.play_banana_detect_sound()
                 elif self.name == "Wood Sage":
                     audio_manager.play_wood_sage_detect_sound()
                 self.has_played_detect_sound = True
             
+            # Attack the enemy
             bullet = BulletFactory.create_bullet(self.name, self.rect.center, nearest, self.damage, enemies)
             bullets.add(bullet)
             self.cool = self.rof
             self.start_attack_animation()
+        else:
+            # No enemies in range, reset detection sound flag
+            self.has_played_detect_sound = False
 
 class ChronoCactusTower(BaseTower):
     """Chrono Cactus tower that slows nearby enemies"""

@@ -407,11 +407,11 @@ class Game:
         return "menu"
     
     def get_toolbar_layout(self, screen_w, screen_h):
-        """Get toolbar layout information for current screen size - fixed layout"""
+        """Get toolbar layout information for current screen size - enhanced layout"""
         toolbar_margin = 15
-        card_width = 100  # Reduce card width to fit better
-        card_height = 90   # Reduce height to fit in toolbar
-        card_spacing = 12  # Reduce spacing
+        card_width = 120  # 增大卡片宽度 从100到120
+        card_height = 105   # 增大卡片高度 从90到105
+        card_spacing = 15  # 增大间距 从12到15
         
         # Simple horizontal layout for all cards
         tower_buttons = []
@@ -421,7 +421,7 @@ class Game:
         start_y = toolbar_margin
         
         # Calculate maximum cards that can fit
-        max_cards_width = screen_w - 250  # Leave more space for larger info panel
+        max_cards_width = screen_w - 280  # Leave space for info panel
         max_cards = (max_cards_width - start_x) // (card_width + card_spacing)
         
         # Create tower buttons
@@ -443,9 +443,9 @@ class Game:
         demolish_y = start_y
         
         # If demolish button won't fit, place on second row
-        if demolish_x + card_width > screen_w - 250:  # Updated for larger info panel
+        if demolish_x + card_width > screen_w - 280:
             demolish_x = start_x
-            demolish_y = start_y + card_height + 10
+            demolish_y = start_y + card_height + 12
         
         demolish_button = {
             'rect': pygame.Rect(demolish_x, demolish_y, card_width, card_height)
@@ -502,9 +502,9 @@ class Game:
             pygame.draw.rect(screen, bg_color, rect, border_radius=8)
             pygame.draw.rect(screen, border_color, rect, 3, border_radius=8)
             
-            # Tower image area - optimized for performance
-            image_area_height = 60  # Smaller image area for better performance
-            image_area_width = rect.width - 16
+            # Tower image area - 增大图片区域
+            image_area_height = 70  # 增大图片高度 从60到70
+            image_area_width = rect.width - 12  # 减少边距
             
             # Try to use cached image first for better performance
             cache_key = f"{tower_type['name']}_{image_area_width}_{image_area_height}_{can_afford}"
@@ -516,7 +516,7 @@ class Game:
                 tower_image = self._image_cache[cache_key]
                 if tower_image:
                     image_x = rect.x + (rect.width - tower_image.get_width()) // 2
-                    image_y = rect.y + 6
+                    image_y = rect.y + 8
                     screen.blit(tower_image, (image_x, image_y))
             else:
                 # Load and cache image
@@ -530,7 +530,7 @@ class Game:
                     
                     scale_x = image_area_width / img_width
                     scale_y = image_area_height / img_height
-                    scale = min(scale_x, scale_y) * 0.85  # Slightly smaller for margins
+                    scale = min(scale_x, scale_y) * 0.9  # 增大比例 从0.85到0.9
                     
                     new_width = int(img_width * scale)
                     new_height = int(img_height * scale)
@@ -550,21 +550,21 @@ class Game:
                     
                     # Draw the image
                     image_x = rect.x + (rect.width - new_width) // 2
-                    image_y = rect.y + 6
+                    image_y = rect.y + 8
                     screen.blit(tower_image, (image_x, image_y))
                     
                 except Exception as e:
                     print(f"Failed to load tower image {tower_type['name']}: {e}")
-                    # Fallback icon
+                    # Fallback icon - 增大图标
                     center_x = rect.centerx
-                    icon_y = rect.y + 30
+                    icon_y = rect.y + 35  # 调整位置
                     icon_color = tower_type['color'] if can_afford else (120, 100, 80)
-                    pygame.draw.circle(screen, icon_color, (center_x, icon_y), 18)
-                    pygame.draw.circle(screen, border_color, (center_x, icon_y), 18, 3)
+                    pygame.draw.circle(screen, icon_color, (center_x, icon_y), 22)  # 增大半径从18到22
+                    pygame.draw.circle(screen, border_color, (center_x, icon_y), 22, 3)
                     
-                    # Add first letter in circle
+                    # Add first letter in circle - 增大字体
                     letter = tower_type['name'][0]
-                    letter_font = pygame.font.SysFont('Arial', 16, bold=True)
+                    letter_font = pygame.font.SysFont('Arial', 20, bold=True)  # 增大字体从16到20
                     letter_text = letter_font.render(letter, True, WHITE if can_afford else (80, 60, 40))
                     letter_rect = letter_text.get_rect(center=(center_x, icon_y))
                     screen.blit(letter_text, letter_rect)
@@ -572,17 +572,17 @@ class Game:
                     # Cache None to avoid repeated failed loads
                     self._image_cache[cache_key] = None
             
-            # Tower name
-            name_text = FONTS['small'].render(tower_type['name'], True, text_color)
+            # Tower name - 增大字体
+            name_text = FONTS['button'].render(tower_type['name'], True, text_color)  # 从small改为button字体
             name_x = rect.centerx - name_text.get_width()//2
-            name_y = rect.y + rect.height - 32
+            name_y = rect.y + rect.height - 38  # 调整位置
             screen.blit(name_text, (name_x, name_y))
             
-            # Price display
+            # Price display - 增大字体
             cost_color = FOREST_GREEN if can_afford else (180, 80, 80)
-            cost_text = FONTS['tiny'].render(f"${TOWER_COSTS[tower_type['name']]}", True, cost_color)
+            cost_text = FONTS['small'].render(f"${TOWER_COSTS[tower_type['name']]}", True, cost_color)  # 从tiny改为small字体
             cost_x = rect.centerx - cost_text.get_width()//2
-            cost_y = rect.y + rect.height - 16
+            cost_y = rect.y + rect.height - 18
             screen.blit(cost_text, (cost_x, cost_y))
         
         # Demolish button - adjusted for smaller cards
@@ -607,14 +607,14 @@ class Game:
         pygame.draw.rect(screen, bg_color, demolish_rect, border_radius=8)
         pygame.draw.rect(screen, border_color, demolish_rect, 3, border_radius=8)
         
-        # Demolish icon - X symbol adjusted for smaller size
+        # Demolish icon - X symbol adjusted for larger size
         center_x, center_y = demolish_rect.center
-        icon_y = demolish_rect.y + 30
+        icon_y = demolish_rect.y + 35  # 调整位置
         
-        # Draw X symbol
+        # Draw X symbol - 增大
         line_color = text_color if not is_demolish_active else WHITE
-        line_width = 3
-        offset = 10
+        line_width = 4  # 增加线宽从3到4
+        offset = 12  # 增大偏移从10到12
         pygame.draw.line(screen, line_color, 
                         (center_x - offset, icon_y - offset), 
                         (center_x + offset, icon_y + offset), line_width)
@@ -622,15 +622,15 @@ class Game:
                         (center_x + offset, icon_y - offset), 
                         (center_x - offset, icon_y + offset), line_width)
         
-        # Demolish text
-        demolish_main = FONTS['tiny'].render("DEMOLISH", True, text_color)
+        # Demolish text - 增大字体
+        demolish_main = FONTS['small'].render("DEMOLISH", True, text_color)  # 从tiny改为small字体
         main_x = demolish_rect.centerx - demolish_main.get_width()//2
-        main_y = demolish_rect.centery + 12
+        main_y = demolish_rect.centery + 18  # 调整位置
         screen.blit(demolish_main, (main_x, main_y))
         
         refund_text = FONTS['tiny'].render("50% Refund", True, text_color)
         refund_x = demolish_rect.centerx - refund_text.get_width()//2
-        refund_y = demolish_rect.y + demolish_rect.height - 14
+        refund_y = demolish_rect.y + demolish_rect.height - 16
         screen.blit(refund_text, (refund_x, refund_y))
         
         # Enhanced Info panel - Right side status display
@@ -673,11 +673,11 @@ class Game:
             label_text = f"{label}: {value}"
             
             # Shadow
-            shadow_surface = FONTS['small'].render(label_text, True, (0, 0, 0, 120))
+            shadow_surface = FONTS['button'].render(label_text, True, (0, 0, 0, 120))
             screen.blit(shadow_surface, (text_x + shadow_offset, icon_y - 8 + shadow_offset))
             
             # Main text
-            text_surface = FONTS['small'].render(label_text, True, value_color)
+            text_surface = FONTS['button'].render(label_text, True, value_color)
             screen.blit(text_surface, (text_x, icon_y - 8))
         
         # Money status

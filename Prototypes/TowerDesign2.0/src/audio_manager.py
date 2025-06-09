@@ -4,23 +4,23 @@ from pathlib import Path
 from typing import Optional
 
 class AudioManager:
-    """音频管理器 - 处理背景音乐和音效"""
+    """Audio manager - handles background music and sound effects"""
     
     def __init__(self):
-        # 初始化pygame音频模块
+        # initialize pygame audio module
         pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=512)
         
-        # 音频文件路径
+        # audio file paths
         self.music_dir = Path(__file__).parent.parent / 'assets' / 'music'
         
-        # 音乐文件映射
+        # music file mapping
         self.music_files = {
             'menu': 'Fantasy Menu Theme.mp3',
             'game': 'game music.ogg', 
             'battle': 'UrbanTheme.mp3'
         }
         
-        # 音效文件映射
+        # sound effect file mapping
         self.sound_files = {
             'flame': 'flame.ogg',
             'death': 'death.wav',
@@ -32,23 +32,23 @@ class AudioManager:
             'wood_sage_detect': 'bear_01.ogg'
         }
         
-        # 状态追踪
+        # state tracking
         self.current_music = None
-        self.music_volume = 0.3  # 背景音乐音量
-        self.sound_volume = 0.5  # 音效音量
+        self.music_volume = 0.3  # background music volume
+        self.sound_volume = 0.5  # sound effect volume
         self.music_enabled = True
         self.sound_enabled = True
         
-        # 加载音效
+        # load sound effects
         self.sounds = {}
         self._load_sounds()
         
-        # 游戏状态
+        # game state
         self.enemy_count = 0
         self.in_battle = False
         
     def _load_sounds(self):
-        """加载所有音效"""
+        """Load all sound effects"""
         for sound_name, filename in self.sound_files.items():
             sound_path = self.music_dir / filename
             try:

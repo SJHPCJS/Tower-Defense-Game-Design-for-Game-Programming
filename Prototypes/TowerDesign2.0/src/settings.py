@@ -1,18 +1,18 @@
 import pygame
 
 
-GRID_SIZE      = 40
+GRID_SIZE      = 32
 GRID_W, GRID_H = 20, 15
 
 # Increase UI height for a richer interface
-UI_HEIGHT   = 120
+UI_HEIGHT   = 140
 SCREEN_W    = GRID_W * GRID_SIZE
 SCREEN_H    = GRID_H * GRID_SIZE + UI_HEIGHT
 FPS         = 60
 
 # Minimum window size
-MIN_SCREEN_W = 800
-MIN_SCREEN_H = 600
+MIN_SCREEN_W = 900
+MIN_SCREEN_H = 700
 
 # Get the maximum screen size for default
 pygame.init()
@@ -25,24 +25,29 @@ DEFAULT_SCREEN_W = MAX_SCREEN_W
 DEFAULT_SCREEN_H = MAX_SCREEN_H
 
 # colours
-WHITE     = (255, 255, 255)
-BLACK     = (0,   0,   0)
-GREEN     = (0, 255,   0)
-RED       = (255, 0,   0)
-BLUE      = (0,   0, 255)
-BG_COLOUR = (173, 216, 230)
-BG_COLOR = BG_COLOUR  # Alias for compatibility
-YELLOW = (255, 210,   0)
-PINK   = (255,  90, 140)
-GOLD = (255, 215, 0)
-SILVER = (192, 192, 192)
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+RED = (255, 0, 0)
+GREEN = (0, 255, 0)
+BLUE = (0, 0, 255)
+GREY = (128, 128, 128)
+YELLOW = (255, 255, 0)
+PURPLE = (128, 0, 128)
+CYAN = (0, 255, 255)
+ORANGE = (255, 165, 0)
+PINK = (255, 192, 203)
 
-# Menu colors
-FOREST_GREEN = (34, 139, 34)
-DARK_GREEN = (0, 100, 0)
-LIGHT_GREEN = (144, 238, 144)
+# Enhanced color palette for forest theme
 BROWN = (139, 69, 19)
+DARK_GREEN = (34, 100, 34)
+FOREST_GREEN = (34, 139, 34)
+LIGHT_GREEN = (144, 238, 144)
 CREAM = (245, 245, 220)
+GOLD = (255, 215, 0)
+
+# Game background - changed back to light blue as requested
+BG_COLOUR = (173, 216, 230)  # Light blue background restored
+BG_COLOR = BG_COLOUR  # Alias for compatibility
 
 # UI Colors
 UI_DARK_BG = (30, 30, 30)
@@ -56,11 +61,11 @@ UI_DANGER = (220, 53, 69)
 # Game settings
 STARTING_MONEY = 200
 TOWER_COSTS = {
-    'Emberwing': 45,
-    'Volt Cow': 45,
-    'Banana Blaster': 40,
-    'Wood Sage': 20,
-    'Chrono Cactus': 45
+    'Emberwing': 25,
+    'Volt Cow': 25,
+    'Banana Blaster': 20,
+    'Wood Sage': 15,
+    'Chrono Cactus': 25
 }
 WAVE_REWARD = 50
 KILL_REWARD = 0
@@ -164,12 +169,12 @@ clock  = pygame.time.Clock()
 pygame.display.set_caption("Forest Guard - Tower Defense")
 FONT = pygame.font.SysFont(None, 24)
 
-# Fonts dictionary for different UI elements
+# Fonts dictionary for different UI elements - optimized font sizes
 FONTS = {
     'title': pygame.font.SysFont('Arial', 72, bold=True),
-    'subtitle': pygame.font.SysFont('Arial', 24),
-    'button': pygame.font.SysFont('Arial', 24, bold=True),
-    'hud': pygame.font.SysFont('Arial', 20),
-    'small': pygame.font.SysFont('Arial', 16),
-    'tiny': pygame.font.SysFont('Arial', 12)
+    'subtitle': pygame.font.SysFont('Arial', 28),  # increased from 24 to 28
+    'button': pygame.font.SysFont('Arial', 20, bold=True),  # reduced from 24 to 20 but kept clear
+    'hud': pygame.font.SysFont('Arial', 22),  # increased from 20 to 22
+    'small': pygame.font.SysFont('Arial', 18),  # increased from 16 to 18
+    'tiny': pygame.font.SysFont('Arial', 14)  # increased from 12 to 14
 }

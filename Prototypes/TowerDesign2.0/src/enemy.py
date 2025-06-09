@@ -219,7 +219,7 @@ class BaseEnemy(pygame.sprite.Sprite):
         self.sprite = EnemySprite(enemy_type)
         
         # Size and image setup
-        self.base_size = 48  # Increased from 32 to 48 (1.5x larger)
+        self.base_size = 36  # Increased from 30 to 36 for slightly larger enemies
         self.size = self.base_size
         self.image = self.get_scaled_image()
         self.rect = self.image.get_rect()
