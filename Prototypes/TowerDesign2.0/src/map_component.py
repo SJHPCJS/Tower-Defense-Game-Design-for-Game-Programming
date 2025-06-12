@@ -1,8 +1,12 @@
+"""
+AI assisted code included in this file, you can see the comments below for details.
+"""
 import pygame
 import random
 from pathlib import Path
 from settings import *
 from grid import GRID_MAP
+from resource_manager import get_sprite_path, get_tiles_path, ResourceManager
 
 class StartSprite:
     """START sprite sheet animation class, supports 4 random state switches"""
@@ -14,7 +18,7 @@ class StartSprite:
         self.state_interval = 30.0  # switch state every 30 seconds
         
         # 4 state frame indices (2x2 sprite sheet)
-        self.states = [0, 1, 2, 3]  # top-left, top-right, bottom-left, bottom-right
+        self.states = [0, 1, 2, 3]  # top-left, top-right, bottom-left, bottom-right !!! not mess the order !!!
         
         # randomly select initial state
         self.current_state = random.randint(0, 3)
@@ -24,33 +28,32 @@ class StartSprite:
     def load_sprite_sheet(self):
         """Load START sprite sheet and cut into frames"""
         try:
-            assets_path = Path(__file__).parent.parent / 'assets' / 'sprite'
-            sheet = pygame.image.load(assets_path / 'START.png').convert_alpha()
+            sheet_path = ResourceManager.get_asset_path("sprite/START.png")
+            sheet = pygame.image.load(str(sheet_path)).convert_alpha()
             
             # assume sprite sheet is 2x2 format, each frame same size
             sheet_w, sheet_h = sheet.get_size()
             frame_w = sheet_w // 2
             frame_h = sheet_h // 2
             
-            # cut frames: [top-left, top-right, bottom-left, bottom-right]
+            # extract 4 frames from 2x2 sprite sheet
             self.sprite_frames = []
-            positions = [(0, 0), (frame_w, 0), (0, frame_h), (frame_w, frame_h)]
+            for row in range(2):
+                for col in range(2):
+                    x = col * frame_w
+                    y = row * frame_h
+                    frame_rect = pygame.Rect(x, y, frame_w, frame_h)
+                    frame = sheet.subsurface(frame_rect).copy()
+                    self.sprite_frames.append(frame)
             
-            for x, y in positions:
-                rect = pygame.Rect(x, y, frame_w, frame_h)
-                frame = sheet.subsurface(rect).copy()
-                self.sprite_frames.append(frame)
-                
             print(f"START sprite loaded: {len(self.sprite_frames)} frames, {frame_w}x{frame_h} each")
             
         except Exception as e:
             print(f"Failed to load START sprite: {e}")
-            # create default squares as fallback
-            self.sprite_frames = []
-            for color in [(0, 255, 0), (0, 200, 255), (255, 0, 255), (255, 255, 0)]:
-                surf = pygame.Surface((GRID_SIZE, GRID_SIZE))
-                surf.fill(color)
-                self.sprite_frames.append(surf)
+            # Fallback: create simple colored frame
+            fallback_frame = pygame.Surface((40, 40))
+            fallback_frame.fill((0, 255, 0))  # Green fallback
+            self.sprite_frames = [fallback_frame] * 4
     
     def update(self, dt):
         """Update state switching"""
@@ -73,6 +76,7 @@ class StartSprite:
 
 class HomeSprite:
     """HOME sprite sheet animation class, supports multiple states and mask effects"""
+    """Develop with ChatGPT- o4-mini-high"""
     
     def __init__(self):
         self.load_sprite_sheet()
@@ -101,33 +105,32 @@ class HomeSprite:
     def load_sprite_sheet(self):
         """Load HOME sprite sheet and cut into frames"""
         try:
-            assets_path = Path(__file__).parent.parent / 'assets' / 'sprite'
-            sheet = pygame.image.load(assets_path / 'HOME.png').convert_alpha()
+            sheet_path = ResourceManager.get_asset_path("sprite/HOME.png")
+            sheet = pygame.image.load(str(sheet_path)).convert_alpha()
             
             # assume sprite sheet is 2x2 format, each frame same size
             sheet_w, sheet_h = sheet.get_size()
             frame_w = sheet_w // 2
             frame_h = sheet_h // 2
             
-            # cut frames: [top-left, top-right, bottom-left, bottom-right]
+            # extract 4 frames from 2x2 sprite sheet
             self.sprite_frames = []
-            positions = [(0, 0), (frame_w, 0), (0, frame_h), (frame_w, frame_h)]
+            for row in range(2):
+                for col in range(2):
+                    x = col * frame_w
+                    y = row * frame_h
+                    frame_rect = pygame.Rect(x, y, frame_w, frame_h)
+                    frame = sheet.subsurface(frame_rect).copy()
+                    self.sprite_frames.append(frame)
             
-            for x, y in positions:
-                rect = pygame.Rect(x, y, frame_w, frame_h)
-                frame = sheet.subsurface(rect).copy()
-                self.sprite_frames.append(frame)
-                
             print(f"HOME sprite loaded: {len(self.sprite_frames)} frames, {frame_w}x{frame_h} each")
             
         except Exception as e:
             print(f"Failed to load HOME sprite: {e}")
-            # create default squares as fallback
-            self.sprite_frames = []
-            for color in [(0, 255, 0), (255, 255, 0), (255, 165, 0), (255, 0, 0)]:
-                surf = pygame.Surface((GRID_SIZE, GRID_SIZE))
-                surf.fill(color)
-                self.sprite_frames.append(surf)
+            # Fallback: create simple colored frame
+            fallback_frame = pygame.Surface((40, 40))
+            fallback_frame.fill((255, 0, 0))  # Red fallback
+            self.sprite_frames = [fallback_frame] * 4
     
     def set_state(self, new_state):
         """Set HOME state"""
@@ -156,6 +159,7 @@ class HomeSprite:
     
     def update(self, dt):
         """Update animation state and mask flashing"""
+        "Operation with ChatGPT- o4-mini-high"
         # update hit state timer
         if self.state == "hit":
             self.hit_timer += dt
@@ -224,10 +228,10 @@ class MapComponent:
         self.enemies_near_home = False
         
     def _load_imgs(self):
-        assets = Path(__file__).parent.parent / 'assets' / 'tiles'
-        self.base_imgs = {
-            0: pygame.image.load(assets/'path.png'),
-            1: pygame.image.load(assets/'grass.png'),
+        """Load tile images"""
+        self.imgs = {
+            0: pygame.image.load(str(get_tiles_path('path.png'))),
+            1: pygame.image.load(str(get_tiles_path('grass.png'))),
         }
 
     def set_spawn_and_home(self, spawn, home):
@@ -300,7 +304,7 @@ class MapComponent:
         
         # Create scaled images
         scaled_imgs = {}
-        for key, img in self.base_imgs.items():
+        for key, img in self.imgs.items():
             scaled_imgs[key] = pygame.transform.scale(img, (scaled_grid_size, scaled_grid_size))
         
         # Calculate the position and size of the game area

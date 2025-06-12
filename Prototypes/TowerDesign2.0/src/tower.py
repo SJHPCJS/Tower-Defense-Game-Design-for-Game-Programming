@@ -4,6 +4,7 @@ import math
 from settings import *
 from bullet import BulletFactory
 from audio_manager import audio_manager
+from resource_manager import get_sprite_path
 
 class TowerSprite:
     """Handles tower sprite loading and animation"""
@@ -17,10 +18,10 @@ class TowerSprite:
         self.frame_duration = 0.5  # Half second per frame
         
         # Load sprite sheet
-        sprite_path = f"assets/sprite/tower/{tower_name}.png"
+        sprite_path = get_sprite_path("tower", f"{tower_name}.png")
         try:
-            if os.path.exists(sprite_path):
-                self.sprite_sheet = pygame.image.load(sprite_path)
+            if sprite_path.exists():
+                self.sprite_sheet = pygame.image.load(str(sprite_path))
                 self.load_frames()
                 print(f"Loaded sprite for {tower_name}")
             else:

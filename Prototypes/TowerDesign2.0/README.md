@@ -1,131 +1,107 @@
-# Tower Defense Game 2.0
+# Forest Guard 2.0 – Project Overview & Quick Start
+## Market-Ready Tower Defence Game
 
-A tower defense game with comprehensive bullet system, special effects, and adaptive UI.
+> “Nature will fight back… and it’s counting on you!”
 
-## Key Features
+Forest Guard is a playful tower-defence experiment built with **Python + Pygame**.  Version 2.0 refactors the original prototype into a cleaner, fairer and much more modular code-base.
 
-### Adaptive UI System
-- **Adaptive Library Toolbar**: Automatically adjusts card spacing and sizes based on screen resolution
-  - Optimal spacing on wide screens (1920px+)
-  - Compressed spacing on medium screens (1024-1366px)
-  - Scaled-down cards on narrow screens (<1024px)
-  - Real-time window resize support
-  - Maintains visual balance across all screen sizes
+---
 
-### Advanced Bullet System
-- **Design Patterns**: Strategy and Factory patterns for bullet behavior
-- **Special Effects**: 
-  - Emberwing: Burn damage (5 damage/sec for 3 seconds) with red "Fire" text
-  - Volt Cow: Electric chain damage (50% to nearby enemies) with yellow "Zap" text
-  - Other towers: Normal damage with white "Miss" text
-- **Visual Enhancements**: 
-  - Bullet rotation animation (360°/second)
-  - Large 40x40 bullet sprites with proper scaling
-  - Text effects sized at 32px for visibility
+## 🚀 What’s New in 2.0
 
-### Game Flow Improvements
-- **Preparation Time**: 10-second countdown before first wave with Chinese/English text support
-- **Unified Forest Guard Theme**: Consistent green/brown color scheme across all interfaces
-- **Enhanced Text Effects**: Properly sized and visible damage/miss indicators
+| Area | 1.x Prototype | 2.0 Implementation |
+|------|--------------|--------------------|
+| **Path-finding** | Dynamic auto-rerouting around towers (hard to predict & unbalanced) | Pure A* with *controlled* random branching at junctions → fair & readable |
+| **Combat system** | Towers/enemies only differed by HP & speed | Full **effect system** (burn, chain-lightning, slow-field, dodge, aura-boost…) |
+| **Level creator** | Manual grid editor, single path | 3 procedural generators (Tower-Path / Maze-Loops / Prim-Loops) + drag-to-paint + auto-cleanup |
+| **Character library** | ─ | In-game card gallery with lore & stats |
+| **Audio** | ─ | Stand-alone **AudioManager** module, automatically switches BGM & key SFX |
+| **Code base** | Monolith | Modular architecture, factories & strategies everywhere |
 
-### UI Enhancements
-- **Level Creator**: Forest Guard themed interface with wood textures and shadows
-- **Library System**: Character gallery with adaptive card layout
-- **ESC Key Bindings**: Return to menu from library and level creator
+---
 
-## Technical Implementation
-
-### Adaptive Library System
-```python
-# Automatically calculates optimal card layout based on screen width
-def init_cards(self):
-    screen_w, screen_h = pygame.display.get_surface().get_size()
-    total_cards = 1 + len(TOWERS) + len(ENEMIES)  # 11 cards total
-    
-    # Adaptive sizing algorithm:
-    # 1. Try base size (140x110) with ideal spacing (25px)
-    # 2. Reduce spacing to minimum (15px) if needed
-    # 3. Scale down cards proportionally if still too wide
-    # 4. Center the entire toolbar on screen
-```
-
-### Bullet Strategy Pattern
-```python
-class BulletStrategy:
-    def create_bullet(self, start_pos, target_pos, tower_name):
-        # Factory method creates appropriate bullet type
-        
-class FireBulletStrategy(BulletStrategy):
-    def apply_damage(self, enemy, enemies_group):
-        # Apply burn effect: 5 damage/sec for 3 seconds
-        
-class ElectricBulletStrategy(BulletStrategy):
-    def apply_damage(self, enemy, enemies_group):
-        # Chain to nearby enemies within 40px for 50% damage
-```
-
-## File Structure
+## 🏗️ Code Architecture
 
 ```
-Prototypes/TowerDesign2.0/
-├── src/
-│   ├── bullets.py          # Bullet system with strategy pattern
-│   ├── game.py            # Main game with preparation time
-│   ├── library.py         # Adaptive character library
-│   ├── level_creator.py   # Forest-themed level creator
-│   ├── main.py           # Updated main menu
-│   └── ...
-├── test_adaptive_library.py    # Adaptive UI demonstration
-├── test_preparation_time.py    # Preparation time test
-├── test_all_improvements.py    # Comprehensive feature test
-└── README.md
+src/
+├── main.py / game.py / run_game.py   # entry point & state machine (menu / play / library / editor)
+│
+├── tower.py        # Tower hierarchy  +  TowerFactory
+├── enemy.py        # Enemy hierarchy  +  EnemyFactory
+├── bullet.py       # Bullet & visual-effect strategies  +  BulletFactory
+│
+├── level.py        # Wave manager  +  A* routing hooks
+├── level_creator.py# Manual + AI map designer (strategy pattern)
+├── map_component.py# Drawable grid + home animation
+├── pathfinding.py  # A* with random branching
+│
+├── audio_manager.py    # Centralised BGM / SFX hub
+├── resource_manager.py # Locate assets both in-dev & in packaged exe
+│
+├── settings.py     # Global constants
+├── library.py      # In-game character encyclopedia
+└── library_data.py # JSON-like dict containing lore & stats
 ```
 
-## Testing
+### Design Patterns Inside
+* Factory Pattern – `TowerFactory`, `EnemyFactory`, `BulletFactory`
+* Strategy Pattern – bullet effects & procedural map generation
+* Observer-lite – `AudioManager` reacts to enemy count without tight coupling
 
-### Adaptive Library Test
+---
+
+## 🧠 AI Highlights
+* **A* Path-finding + random branching** – keeps routes fresh yet predictable enough for planning.
+* **State-driven game loop** – lightweight FSM toggling between *menu / gameplay / library / editor*.
+
+---
+
+## 🛠️ Building & Running
+
+1. Install dependencies
+
 ```bash
-python test_adaptive_library.py
+pip install -r requirements.txt
 ```
-- Press SPACE to cycle through different screen resolutions
-- Drag window edges to test real-time resizing
-- Observe automatic card spacing and size adjustments
 
-### Preparation Time Test
-```bash
-python test_preparation_time.py
-```
-- Shows 10-second countdown before first wave
-- Displays timing in wave panel
-
-### Comprehensive Test
-```bash
-python test_all_improvements.py
-```
-- Tests all features: bullets, effects, preparation time, and adaptive UI
-
-## Screen Size Support
-
-| Resolution | Card Size | Spacing | Behavior |
-|------------|-----------|---------|-----------|
-| 2560x1440+ | 140x110 | 25px | Optimal layout with generous spacing |
-| 1920x1080 | 140x110 | 25px | Standard layout |
-| 1366x768 | 140x110 | 15px | Compressed spacing |
-| 1024x768 | 120x96 | 15px | Scaled down cards |
-| 800x600 | 100x80 | 15px | Minimum card size |
-
-The adaptive system ensures the library toolbar remains functional and visually appealing across all supported screen sizes, automatically adjusting layout parameters without requiring manual configuration.
-
-## Running the Game
+2. Launch the game (source version)
 
 ```bash
 python run_game.py
 ```
 
-Navigate through the menus to access:
-- **PLAY**: Start the game with preparation time
-- **LIBRARY**: View adaptive character gallery
-- **LEVEL CREATOR**: Create custom levels with Forest Guard theme
-- **QUIT**: Exit the game
+3. Create a portable **.exe** (Windows)
 
-All interfaces support ESC key to return to the main menu. 
+```bash
+python build_executable.py   # or just double-click build_game.bat
+```
+
+The compiled executable will land here:
+
+```
+dist/ForestGuard2.0/ForestGuard2.0.exe
+```
+
+Send that single folder to a friend – no Python required!
+
+> **Tip**   Assets are bundled automatically.
+
+---
+
+## 👂 Play-Testing & Iteration
+* Removed auto-reroute → fairness ++
+* Adjusted tower costs
+* Added Library after players asked “what can it do?”
+* Integrated drag-paint in editor to spare everyone’s wrists
+
+Iterate → Refactor → Test → Repeat – that’s how we got here.
+
+---
+
+## 📁 License & Assets
+Open-source.  Sprites & sounds are either CC0, permissive licences, or AI-generated – see `/assets/README_assets.txt` for a all links.
+
+Happy modding, and may the forest be with you 🌲🛡️ 
+
+## Thanks for ChatGPT for helping with refactoring and README modification!
+AI declaration can be found in code comments and report.

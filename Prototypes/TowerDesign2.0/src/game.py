@@ -1,3 +1,6 @@
+"""
+AI assisted code included in this file, you can see the comments below for details.
+"""
 import sys
 import pygame
 import json
@@ -14,9 +17,11 @@ from level import Level
 from tower import TowerFactory
 from bullet import Bullet
 from audio_manager import audio_manager
+from resource_manager import get_library_path
 
-class TowerButtonCache:
-    """防御塔按钮图片缓存"""
+class TowerImageCache:
+    """Cache system for tower images"""
+    """This class is inspired and supported by ChatGPT-o4-mini-high. It provides a caching mechanism for tower images to improve performance and reduce loading times."""
     _tower_images = {}
     _tower_images_gray = {}
     
@@ -26,9 +31,9 @@ class TowerButtonCache:
         
         if cache_key not in cls._tower_images:
             try:
-                library_image_path = f"assets/library/tower/{tower_name}.png"
-                image = pygame.image.load(library_image_path)
-
+                library_image_path = get_library_path("tower", f"{tower_name}.png")
+                image = pygame.image.load(str(library_image_path))
+                
                 scaled_image = pygame.transform.scale(image, size)
                 
                 if grayscale:
@@ -93,14 +98,13 @@ class Game:
         try:
             with open(level_file, 'r', encoding='utf-8') as f:
                 level_data = json.load(f)
-            
-            # Update best time
+
             if 'settings' not in level_data:
                 level_data['settings'] = {}
             
             level_data['settings']['best_time'] = new_time
             
-            # Save back to file
+
             with open(level_file, 'w', encoding='utf-8') as f:
                 json.dump(level_data, f, indent=2, ensure_ascii=False)
             
@@ -118,19 +122,15 @@ class Game:
         if 'grid' in level_data:
             level.grid = level_data['grid']
         
-        # Load level settings
+
         level.load_settings(level_data)
-        
-        # NOW call recalculate_path with the correct grid data
+
         level.recalculate_path()
-        
-        # Initialize first wave composition
+
         level.start_first_wave()
-        
-        # Initialize MapComponent with the correct grid data
+
         game_map = MapComponent(grid=level.grid)
-        
-        # Set spawn and home for map component
+
         game_map.set_spawn_and_home(level.start, level.end)
         
         towers = pygame.sprite.Group()
@@ -138,7 +138,7 @@ class Game:
         sel = None
         game_over = False
         game_won = False
-        money = level.initial_money  # Use level-specific initial money
+        money = level.initial_money
         selected_tower = None
         current_screen_size = screen.get_size()
         
@@ -149,46 +149,40 @@ class Game:
         
         # Level start countdown
         show_level_start = True
-        level_start_timer = 3.0  # 3 seconds countdown
+        level_start_timer = 3.0
         game_timer_started = False
         
         # Wave completion message display
         wave_message = ""
         wave_message_timer = 0.0
-        wave_message_duration = 3.0  # Show for 3 seconds
-        
-        # 性能优化：减少更新频率
+        wave_message_duration = 3.0
+
         ui_update_timer = 0.0
-        ui_update_interval = 0.1  # 每0.1秒更新一次UI
+        ui_update_interval = 0.1
         
         # Kill reward callback function
         def on_enemy_killed(enemy):
             nonlocal money
-            # Use enemy-specific reward if available, otherwise use default KILL_REWARD
+
             reward = getattr(enemy, 'reward', KILL_REWARD)
             money += reward
             print(f"{getattr(enemy, 'enemy_type', 'Enemy')} killed! Reward: +${reward}")
-        
-        # Set kill callback for level
+
         level.set_kill_callback(on_enemy_killed)
         
-        # 开始游戏时播放游戏音乐（无敌人状态）
+
         audio_manager.play_game_music()
-        # 初始化敌人数量为0
         audio_manager.update_enemy_count(0)
-        
-        # Toolbar settings will be dynamically calculated in draw_enhanced_toolbar
+
         
         running = True
         clock = pygame.time.Clock()
         
         while running:
-            # 限制帧率到60FPS以提高性能
             dt = clock.tick(60)/1000.0
             mouse_pos = pygame.mouse.get_pos()
             current_screen_size = screen.get_size()
-            
-            # 累计UI更新时间
+
             ui_update_timer += dt
             should_update_ui = ui_update_timer >= ui_update_interval
             if should_update_ui:
@@ -199,7 +193,7 @@ class Game:
                 level_start_timer -= dt
                 if level_start_timer <= 0:
                     show_level_start = False
-                    start_time = time.time()  # Start timing now
+                    start_time = time.time()
                     game_timer_started = True
             
             # Update game time if game is running and timer has started
@@ -236,15 +230,14 @@ class Game:
                         if my < UI_HEIGHT:
                             # Get toolbar button info
                             toolbar_info = self.get_toolbar_layout(screen_w, screen_h)
-                            
-                            # Check tower build buttons - FIXED: break is now inside the if condition
+
                             for button_info in toolbar_info['tower_buttons']:
                                 if button_info['rect'].collidepoint(mx, my):
                                     if money >= TOWER_COSTS[button_info['type']['name']]:
                                         sel = button_info['type']
                                         # Reset demolish mode
                                         selected_tower = None
-                                    break  # Only break when a button is actually clicked
+                                    break
                             
                             # Check demolish button
                             if toolbar_info['demolish_button']['rect'].collidepoint(mx, my):
@@ -257,7 +250,6 @@ class Game:
                             # Game area click
                             gx, gy = px_to_grid(mx, my, screen_w, screen_h)
                             if 0 <= gx < GRID_W and 0 <= gy < GRID_H:
-                                # Demolish mode
                                 if selected_tower == "demolish_mode":
                                     # Find tower at this position
                                     for tower in towers:
@@ -268,9 +260,7 @@ class Game:
                                             tower.kill()
                                             selected_tower = None
                                             break
-                                # Build mode - USE LEVEL GRID DATA INSTEAD OF GRID_MAP
                                 elif level.grid and level.grid[gy][gx] == 1 and sel:  # 1 = grass, 0 = path
-                                    # Check if there is already a tower at this position
                                     can_build = True
                                     for tower in towers:
                                         if tower.gx == gx and tower.gy == gy:
@@ -284,7 +274,6 @@ class Game:
 
             # Update game logic only if the game is not over and level start is complete
             if not game_over and not game_won and not show_level_start:
-                # Store previous wave state to detect completion
                 prev_wave_complete = level.wave_complete
                 prev_wave = level.current_wave
                 
@@ -301,32 +290,23 @@ class Game:
                 
                 # Check if enemies have reached the end and trigger HOME hit animation
                 for e in list(level.enemies):
-                    # Check new version enemy's end reached logic
                     if hasattr(e, 'path_index') and e.path_index >= len(e.path) - 1:
-                        # Trigger HOME hit animation before removing enemy
-                        game_map.on_home_hit()
-                        level.base_hp -= 1
-                        # Play home hit sound
-                        audio_manager.play_home_hit_sound()
-                        # Clean up speed modifiers
-                        if hasattr(e, 'cleanup_speed_modifiers'):
-                            e.cleanup_speed_modifiers()
-                        e.kill()
-                        print(f"Enemy reached HOME! Base HP: {level.base_hp}")
-                    # Compatibility with old version enemy
-                    elif hasattr(e, 'reached_end') and e.reached_end:
-                        # Trigger HOME hit animation before removing enemy
                         game_map.on_home_hit()
                         level.base_hp -= getattr(e, 'damage_to_base', 1)
-                        # Play home hit sound
                         audio_manager.play_home_hit_sound()
-                        # Clean up speed modifiers
                         if hasattr(e, 'cleanup_speed_modifiers'):
                             e.cleanup_speed_modifiers()
                         e.kill()
                         print(f"Enemy reached HOME! Base HP: {level.base_hp}")
-                
-                # Check for wave completion reward - trigger when wave becomes complete
+                    elif hasattr(e, 'reached_end') and e.reached_end:
+                        game_map.on_home_hit()
+                        level.base_hp -= getattr(e, 'damage_to_base', 1)
+                        audio_manager.play_home_hit_sound()
+                        if hasattr(e, 'cleanup_speed_modifiers'):
+                            e.cleanup_speed_modifiers()
+                        e.kill()
+                        print(f"Enemy reached HOME! Base HP: {level.base_hp}")
+
                 if level.wave_complete and not prev_wave_complete:
                     # Wave just completed, give reward immediately
                     money += WAVE_REWARD
@@ -339,7 +319,6 @@ class Game:
                 # Check game over condition
                 if level.base_hp <= 0:
                     game_over = True
-                    # Stop all audio first, then play game over sound
                     audio_manager.stop_all_audio()
                     audio_manager.play_game_over_sound()
                 
@@ -347,7 +326,6 @@ class Game:
                 if level.all_waves_complete:
                     game_won = True
                     final_time = current_game_time
-                    # Play victory sound
                     audio_manager.play_victory_sound()
                     
                     # Check if this is a new best time
@@ -364,6 +342,9 @@ class Game:
                 if wave_message_timer >= wave_message_duration:
                     wave_message = ""
 
+            """
+            This section is inspired and supported by ChatGPT-o4-mini-high.
+            """
             # Draw screen elements
             current_screen = pygame.display.get_surface()
             current_screen.fill(BG_COLOUR)
@@ -377,15 +358,12 @@ class Game:
             
             # Draw bullets
             bullets.draw(current_screen)
-            
-            # 只在需要时更新UI元素以提高性能
-            # Draw UI (always draw toolbar for responsiveness)
+
             self.draw_enhanced_toolbar(current_screen, current_screen_size, sel, selected_tower, money, level.base_hp, level.name, level)
             
             # Draw wave panel with updated format
             self.draw_wave_panel_with_timing(current_screen, current_screen_size, level, current_game_time)
-            
-            # Draw enemies and their effects LAST to appear on top of everything (including toolbar)
+
             level.draw(current_screen)
             
             # Draw wave completion message if active
@@ -409,24 +387,22 @@ class Game:
     def get_toolbar_layout(self, screen_w, screen_h):
         """Get toolbar layout information for current screen size - enhanced layout"""
         toolbar_margin = 15
-        card_width = 120  # 增大卡片宽度 从100到120
-        card_height = 105   # 增大卡片高度 从90到105
-        card_spacing = 15  # 增大间距 从12到15
-        
-        # Simple horizontal layout for all cards
+        card_width = 120
+        card_height = 105
+        card_spacing = 15
+
         tower_buttons = []
         
         # Starting position
         start_x = toolbar_margin
         start_y = toolbar_margin
-        
-        # Calculate maximum cards that can fit
+
         max_cards_width = screen_w - 280  # Leave space for info panel
         max_cards = (max_cards_width - start_x) // (card_width + card_spacing)
         
         # Create tower buttons
         for i, tower_type in enumerate(TOWER_TYPES):
-            if i >= max_cards:  # Don't create cards that won't fit
+            if i >= max_cards:
                 break
                 
             x = start_x + i * (card_width + card_spacing)
@@ -458,17 +434,14 @@ class Game:
 
     def draw_enhanced_toolbar(self, screen, screen_size, selected_type, selected_tower, money, base_hp, level_name, level):
         """Draw enhanced toolbar with jungle theme like library"""
+        """The design is made with ChatGPT-4o"""
         screen_w, screen_h = screen_size
-        
-        # 丛林主题工具栏背景 - 和library一致
+
         toolbar_rect = pygame.Rect(0, 0, screen_w, UI_HEIGHT)
-        pygame.draw.rect(screen, BROWN, toolbar_rect)  # 棕色背景
-        pygame.draw.rect(screen, DARK_GREEN, toolbar_rect, 4)  # 深绿色边框
-        
-        # Get layout information
+        pygame.draw.rect(screen, BROWN, toolbar_rect)
+        pygame.draw.rect(screen, DARK_GREEN, toolbar_rect, 4)
         layout = self.get_toolbar_layout(screen_w, screen_h)
-        
-        # 丛林主题防御塔建造按钮
+
         mx, my = pygame.mouse.get_pos()
         
         for button_info in layout['tower_buttons']:
@@ -479,34 +452,30 @@ class Game:
             is_selected = selected_type == tower_type
             can_afford = money >= TOWER_COSTS[tower_type['name']]
             is_hovered = rect.collidepoint(mx, my) and my < UI_HEIGHT
-            
-            # 丛林主题卡片外观
+
             if is_selected:
-                bg_color = FOREST_GREEN  # 森林绿色选中
+                bg_color = FOREST_GREEN
                 border_color = LIGHT_GREEN
                 text_color = WHITE
             elif not can_afford:
-                bg_color = (160, 140, 120)  # 棕灰色无法购买
+                bg_color = (160, 140, 120)
                 border_color = (120, 100, 80)
                 text_color = (100, 80, 60)
             elif is_hovered:
-                bg_color = LIGHT_GREEN  # 浅绿色悬停
+                bg_color = LIGHT_GREEN
                 border_color = FOREST_GREEN
                 text_color = DARK_GREEN
             else:
-                bg_color = CREAM  # 米色默认
+                bg_color = CREAM
                 border_color = BROWN
                 text_color = DARK_GREEN
-            
-            # 绘制丛林风格卡片
+
             pygame.draw.rect(screen, bg_color, rect, border_radius=8)
             pygame.draw.rect(screen, border_color, rect, 3, border_radius=8)
-            
-            # Tower image area - 增大图片区域
-            image_area_height = 70  # 增大图片高度 从60到70
-            image_area_width = rect.width - 12  # 减少边距
-            
-            # Try to use cached image first for better performance
+
+            image_area_height = 70
+            image_area_width = rect.width - 12
+
             cache_key = f"{tower_type['name']}_{image_area_width}_{image_area_height}_{can_afford}"
             
             if not hasattr(self, '_image_cache'):
@@ -519,52 +488,45 @@ class Game:
                     image_y = rect.y + 8
                     screen.blit(tower_image, (image_x, image_y))
             else:
-                # Load and cache image
-                original_image_path = f"assets/library/tower/{tower_type['name']}.png"
+                original_image_path = get_library_path("tower", f"{tower_type['name']}.png")
                 try:
-                    original_image = pygame.image.load(original_image_path)
-                    
-                    # Calculate optimal size while maintaining aspect ratio
+                    original_image = pygame.image.load(str(original_image_path))
+
                     img_width = original_image.get_width()
                     img_height = original_image.get_height()
                     
                     scale_x = image_area_width / img_width
                     scale_y = image_area_height / img_height
-                    scale = min(scale_x, scale_y) * 0.9  # 增大比例 从0.85到0.9
+                    scale = min(scale_x, scale_y) * 0.9
                     
                     new_width = int(img_width * scale)
                     new_height = int(img_height * scale)
-                    
-                    # Create final image with grayscale if needed
+
                     if can_afford:
                         tower_image = pygame.transform.scale(original_image, (new_width, new_height))
                     else:
-                        # Simplified grayscale for better performance
                         scaled_image = pygame.transform.scale(original_image, (new_width, new_height))
                         tower_image = pygame.Surface((new_width, new_height), pygame.SRCALPHA)
                         tower_image.fill((128, 128, 128, 180))  # Simple gray overlay
                         tower_image.blit(scaled_image, (0, 0), special_flags=pygame.BLEND_MULT)
-                    
-                    # Cache the result
+
                     self._image_cache[cache_key] = tower_image
-                    
-                    # Draw the image
+
                     image_x = rect.x + (rect.width - new_width) // 2
                     image_y = rect.y + 8
                     screen.blit(tower_image, (image_x, image_y))
                     
                 except Exception as e:
                     print(f"Failed to load tower image {tower_type['name']}: {e}")
-                    # Fallback icon - 增大图标
+
                     center_x = rect.centerx
-                    icon_y = rect.y + 35  # 调整位置
+                    icon_y = rect.y + 35
                     icon_color = tower_type['color'] if can_afford else (120, 100, 80)
-                    pygame.draw.circle(screen, icon_color, (center_x, icon_y), 22)  # 增大半径从18到22
+                    pygame.draw.circle(screen, icon_color, (center_x, icon_y), 22)
                     pygame.draw.circle(screen, border_color, (center_x, icon_y), 22, 3)
-                    
-                    # Add first letter in circle - 增大字体
+
                     letter = tower_type['name'][0]
-                    letter_font = pygame.font.SysFont('Arial', 20, bold=True)  # 增大字体从16到20
+                    letter_font = pygame.font.SysFont('Arial', 20, bold=True)
                     letter_text = letter_font.render(letter, True, WHITE if can_afford else (80, 60, 40))
                     letter_rect = letter_text.get_rect(center=(center_x, icon_y))
                     screen.blit(letter_text, letter_rect)
@@ -572,20 +534,20 @@ class Game:
                     # Cache None to avoid repeated failed loads
                     self._image_cache[cache_key] = None
             
-            # Tower name - 增大字体
-            name_text = FONTS['button'].render(tower_type['name'], True, text_color)  # 从small改为button字体
+            # Tower name
+            name_text = FONTS['button'].render(tower_type['name'], True, text_color)
             name_x = rect.centerx - name_text.get_width()//2
             name_y = rect.y + rect.height - 38  # 调整位置
             screen.blit(name_text, (name_x, name_y))
             
-            # Price display - 增大字体
+            # Price display
             cost_color = FOREST_GREEN if can_afford else (180, 80, 80)
-            cost_text = FONTS['small'].render(f"${TOWER_COSTS[tower_type['name']]}", True, cost_color)  # 从tiny改为small字体
+            cost_text = FONTS['small'].render(f"${TOWER_COSTS[tower_type['name']]}", True, cost_color)
             cost_x = rect.centerx - cost_text.get_width()//2
             cost_y = rect.y + rect.height - 18
             screen.blit(cost_text, (cost_x, cost_y))
         
-        # Demolish button - adjusted for smaller cards
+        # Demolish button
         demolish_rect = layout['demolish_button']['rect']
         is_demolish_active = selected_tower == "demolish_mode"
         is_demolish_hovered = demolish_rect.collidepoint(mx, my) and my < UI_HEIGHT
@@ -609,12 +571,12 @@ class Game:
         
         # Demolish icon - X symbol adjusted for larger size
         center_x, center_y = demolish_rect.center
-        icon_y = demolish_rect.y + 35  # 调整位置
+        icon_y = demolish_rect.y + 35
         
-        # Draw X symbol - 增大
+        # Draw X symbol
         line_color = text_color if not is_demolish_active else WHITE
-        line_width = 4  # 增加线宽从3到4
-        offset = 12  # 增大偏移从10到12
+        line_width = 4
+        offset = 12
         pygame.draw.line(screen, line_color, 
                         (center_x - offset, icon_y - offset), 
                         (center_x + offset, icon_y + offset), line_width)
@@ -622,10 +584,10 @@ class Game:
                         (center_x + offset, icon_y - offset), 
                         (center_x - offset, icon_y + offset), line_width)
         
-        # Demolish text - 增大字体
-        demolish_main = FONTS['small'].render("DEMOLISH", True, text_color)  # 从tiny改为small字体
+        # Demolish text
+        demolish_main = FONTS['small'].render("DEMOLISH", True, text_color)
         main_x = demolish_rect.centerx - demolish_main.get_width()//2
-        main_y = demolish_rect.centery + 18  # 调整位置
+        main_y = demolish_rect.centery + 18
         screen.blit(demolish_main, (main_x, main_y))
         
         refund_text = FONTS['tiny'].render("50% Refund", True, text_color)
@@ -633,7 +595,7 @@ class Game:
         refund_y = demolish_rect.y + demolish_rect.height - 16
         screen.blit(refund_text, (refund_x, refund_y))
         
-        # Enhanced Info panel - Right side status display
+        # Enhanced Info panel
         info_panel_x = screen_w - 280
         info_panel_w = 260
         info_panel_h = UI_HEIGHT - 20
@@ -707,10 +669,9 @@ class Game:
     def draw_wave_panel(self, screen, screen_size, level):
         """Draw wave information panel on top of everything"""
         screen_w, screen_h = screen_size
-        
-        # Wave information panel (bottom-left area)
+
         wave_panel_x = 20
-        wave_panel_y = screen_h - 80  # Position near bottom of screen
+        wave_panel_y = screen_h - 80
         wave_panel_w = 300
         wave_panel_h = 60
         wave_panel_rect = pygame.Rect(wave_panel_x, wave_panel_y, wave_panel_w, wave_panel_h)
@@ -723,58 +684,50 @@ class Game:
         
         # Wave progress
         if level.in_preparation and not level.first_wave_started:
-            # Show preparation countdown
             time_left = level.preparation_time - level.preparation_timer
             countdown_text = FONTS['small'].render(f"First wave in: {time_left:.1f}s", True, (255, 100, 100))
             screen.blit(countdown_text, (wave_panel_x + 10, wave_panel_y + 30))
         elif level.in_wave_break:
-            # Show countdown during wave break
             time_left = level.wave_break_duration - level.wave_break_timer
             countdown_text = FONTS['small'].render(f"Next wave in: {time_left:.1f}s", True, UI_WARNING)
             screen.blit(countdown_text, (wave_panel_x + 10, wave_panel_y + 30))
         else:
-            # Show enemy progress during wave
             living_enemies = len([e for e in level.enemies if hasattr(e, 'health') and e.health > 0])
             progress_text = FONTS['small'].render(f"Enemies: {level.enemies_spawned_this_wave}/{level.enemies_in_wave} (Alive: {living_enemies})", True, WHITE)
             screen.blit(progress_text, (wave_panel_x + 10, wave_panel_y + 30))
 
     def draw_wave_message(self, screen, screen_size, message):
         """Draw simplified wave completion message"""
+        """Optimized with ChatGPT-4o"""
         screen_w, screen_h = screen_size
-        
-        # Calculate text dimensions
+
         main_text = FONTS['title'].render(message, True, WHITE)
         text_w, text_h = main_text.get_size()
-        
-        # Panel dimensions
+
         panel_w = text_w + 100
         panel_h = text_h + 60
         panel_x = (screen_w - panel_w) // 2
         panel_y = (screen_h - panel_h) // 2 - 50
-        
-        # Simple background overlay
+
         overlay = pygame.Surface((screen_w, screen_h), pygame.SRCALPHA)
         overlay.fill((10, 30, 10, 100))
         screen.blit(overlay, (0, 0))
-        
-        # Simple panel
+
         pygame.draw.rect(screen, (40, 70, 40, 220), (panel_x, panel_y, panel_w, panel_h), border_radius=15)
         pygame.draw.rect(screen, (220, 180, 100), (panel_x, panel_y, panel_w, panel_h), 3, border_radius=15)
-        
-        # Text with simple shadow
+
         text_x = panel_x + (panel_w - text_w) // 2
         text_y = panel_y + (panel_h - text_h) // 2
-        
-        # Shadow
+
         shadow_text = FONTS['title'].render(message, True, (0, 0, 0))
         screen.blit(shadow_text, (text_x + 2, text_y + 2))
-        
-        # Main text
+
         main_text_render = FONTS['title'].render(message, True, (255, 250, 240))
         screen.blit(main_text_render, (text_x, text_y))
 
     def draw_game_over_screen(self, screen, screen_size, victory=False):
         """Draw game over screen with clear text and dynamic background"""
+        """Enhanced with ChatGPT-4o"""
         screen_w, screen_h = screen_size
         
         # Dynamic timing
@@ -877,6 +830,7 @@ class Game:
 
     def draw_wave_panel_with_timing(self, screen, screen_size, level, current_game_time):
         """Draw beautiful wave panel with forest theme"""
+        """Enhanced with ChatGPT-4o, but lots of changes made by myself"""
         screen_w, screen_h = screen_size
         
         # Calculate content
@@ -916,7 +870,6 @@ class Game:
         # Multi-layer gradient for depth
         for i in range(panel_h):
             progress = i / panel_h
-            # Forest theme gradient: dark forest green to lighter woodland green
             r = int(25 + (45 - 25) * progress)
             g = int(60 + (80 - 60) * progress) 
             b = int(25 + (35 - 25) * progress)
@@ -1014,7 +967,7 @@ class Game:
             ]
             primary_color = (255, 215, 0)      # Pure gold
             secondary_color = (255, 240, 150)  # Light gold
-            celebration_text = "★ NEW RECORD ACHIEVED! ★"
+            celebration_text = "NEW RECORD ACHIEVED!"
             panel_base_color = (60, 45, 15)    # Dark golden base
         else:
             # Elegant golden victory theme

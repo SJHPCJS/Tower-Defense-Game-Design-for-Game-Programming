@@ -1,3 +1,0 @@
-Algorithm,Avg Time (ms),Avg Path Tiles,Avg Branch Points,Avg Cleaned Tiles
-Original,0.747,183.2,60.9,0.0
-Optimized,1.495,49.0,8.4,134.2

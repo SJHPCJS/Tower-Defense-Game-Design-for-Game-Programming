@@ -1,3 +1,6 @@
+"""
+AI assisted code included in this file, you can see the comments below for details.
+"""
 import pygame
 import sys
 import os
@@ -88,6 +91,7 @@ class MainMenu:
         
     def init_natural_effects(self):
         """Initialize natural effect elements"""
+        """Totally optimized with ChatGPT-o4-mini-high, with fully copied code from the AI. (It really did a great job!)"""
         # Pixel style clouds
         self.clouds = []
         for i in range(4):  # Reduce cloud count for better performance

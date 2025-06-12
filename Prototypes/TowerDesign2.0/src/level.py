@@ -9,7 +9,7 @@ class Level:
     def __init__(self):
         self.enemies = pygame.sprite.Group()
         self.timer = 0.0
-        self.delay = 0.5  # Adjusted from 0.3 to 0.5 for better balance
+        self.delay = 0.5
         self.base_hp = 10
         self.name = "Default Level"
         self.grid = None
@@ -22,7 +22,7 @@ class Level:
         self.enemies_killed_this_wave = 0
         self.wave_complete = False
         self.wave_break_timer = 0.0
-        self.wave_break_duration = 8.0  # Increased from 5.0 to 8.0 seconds for more building time
+        self.wave_break_duration = 8.0
         self.in_wave_break = False
         
         # Preparation time system
@@ -43,9 +43,7 @@ class Level:
         
         # Game completion state
         self.all_waves_complete = False
-        
-        # Remove automatic path initialization - will be called manually after grid is set
-        # self.recalculate_path()  # Commented out
+
     
     def load_settings(self, level_data):
         """Load level settings from JSON data"""
@@ -54,15 +52,15 @@ class Level:
             self.initial_money = settings.get('initial_money', STARTING_MONEY)
             self.total_waves = settings.get('wave_count', 5)
             self.enemy_speed = settings.get('enemy_speed', 50)
-            self.base_hp = settings.get('base_hp', 10)  # load custom base_hp
+            self.base_hp = settings.get('base_hp', 10)
             self.best_time = settings.get('best_time', None)
             print(f"Level settings: Money=${self.initial_money}, Waves={self.total_waves}, Speed={self.enemy_speed}, Base HP={self.base_hp}")
         else:
-            # Default settings for backward compatibility
+
             self.initial_money = STARTING_MONEY
             self.total_waves = 5
             self.enemy_speed = 50
-            self.base_hp = 10  # default base_hp
+            self.base_hp = 10
             self.best_time = None
     
     def recalculate_path(self):
@@ -224,8 +222,7 @@ class Level:
                         self.enemies.add(enemy)
                         self.enemies_spawned_this_wave += 1
                         print(f"Spawned {enemy_type} {self.enemies_spawned_this_wave}/{self.enemies_in_wave}")
-        
-        # Note: Enemy end-reached logic moved to game.py for HOME animation integration
+
 
     def start_first_wave(self):
         """Initialize the first wave composition"""

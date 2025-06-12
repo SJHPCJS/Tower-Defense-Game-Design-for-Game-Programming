@@ -1,31 +1,37 @@
 import json, os
 from settings import GRID_W, GRID_H
+from resource_manager import ResourceManager
 
 def load_grid(filename: str) -> list[list[int]]:
     """Load 0/1 grid from levels/filename (must be 20×15)."""
-    fpath = os.path.join(os.path.dirname(__file__), '..', 'levels', filename)
     try:
-        with open(fpath, 'r', encoding='utf-8') as f:
+        level_path = ResourceManager.get_level_path(filename)
+        with open(level_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
+        return data['grid']
     except UnicodeDecodeError:
-        # Fallback to other encodings if UTF-8 fails
-        with open(fpath, 'r', encoding='utf-8-sig') as f:
+        level_path = ResourceManager.get_level_path(filename)
+        with open(level_path, 'r', encoding='utf-8-sig') as f:
             data = json.load(f)
-    grid = data.get('grid')
-    if len(grid) != GRID_H or any(len(r) != GRID_W for r in grid):
-        raise ValueError("Level size must be 20×15")
-    return grid
+        return data['grid']
 
 # Create a default empty grid (all grass)
 GRID_MAP: list[list[int]] = [[1 for _ in range(GRID_W)] for _ in range(GRID_H)]
 
-def update_grid_map(new_grid: list[list[int]]):
-    """Update the global GRID_MAP with new grid data"""
+def update_grid_map(new_grid):
+    """Update global grid map"""
     global GRID_MAP
-    if len(new_grid) == GRID_H and all(len(r) == GRID_W for r in new_grid):
-        GRID_MAP = [row[:] for row in new_grid]  # Deep copy
-    else:
-        raise ValueError("Grid size must be 20×15")
+    GRID_MAP = new_grid
 
-def walkable(x: int, y: int) -> bool:
-    return 0 <= x < GRID_W and 0 <= y < GRID_H and GRID_MAP[y][x] == 0
+def walkable(gx: int, gy: int) -> bool:
+    return GRID_MAP[gy][gx] == 0
+
+# Load default grid map
+try:
+    GRID_MAP: list[list[int]] = load_grid('Level5Path.json')
+except:
+    # Fallback grid if file not found
+    GRID_MAP = [[1 for _ in range(GRID_W)] for _ in range(GRID_H)]
+    # Create a simple path down the middle
+    for y in range(GRID_H):
+        GRID_MAP[y][GRID_W//2] = 0

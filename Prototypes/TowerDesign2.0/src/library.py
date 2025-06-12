@@ -1,9 +1,13 @@
+"""
+AI assisted code included in this file, the init grid layout is designed by ChatGPT, including color.
+"""
 import pygame
 import os
 import math
 from settings import *
 from library_data import LIBRARY_DATA, TOWERS, ENEMIES
 from audio_manager import audio_manager
+from resource_manager import ResourceManager
 
 class ImageCache:
     """Image cache system to avoid repeated loading"""
@@ -14,7 +18,15 @@ class ImageCache:
         cache_key = f"{path}_{size}"
         if cache_key not in cls._cache:
             try:
-                image = pygame.image.load(path)
+                # Handle relative paths using ResourceManager
+                if not path.startswith('/') and not path.startswith('C:'):
+                    # This is a relative path, use ResourceManager
+                    image_path = ResourceManager.get_asset_path(path)
+                    image = pygame.image.load(str(image_path))
+                else:
+                    # This is an absolute path, use as-is
+                    image = pygame.image.load(path)
+                
                 if size:
                     image = pygame.transform.scale(image, size)
                 cls._cache[cache_key] = image
@@ -137,8 +149,15 @@ class SpriteAnimator:
     
     def load_sprite_sheet(self, sprite_path):
         """Load sprite sheet - 2x2 layout, like main game"""
+        """"2x2 layout sprite sheet loading"""
         try:
-            sprite_sheet = pygame.image.load(sprite_path)
+            # Handle relative paths using ResourceManager
+            if not sprite_path.startswith('/') and not sprite_path.startswith('C:'):
+                image_path = ResourceManager.get_asset_path(sprite_path)
+                sprite_sheet = pygame.image.load(str(image_path))
+            else:
+                sprite_sheet = pygame.image.load(sprite_path)
+                
             sheet_width = sprite_sheet.get_width()
             sheet_height = sprite_sheet.get_height()
             
@@ -147,7 +166,6 @@ class SpriteAnimator:
             frame_height = sheet_height // 2
             
             self.frames = []
-            # load in 2x2 order: top-left, top-right, bottom-left, bottom-right
             for row in range(2):
                 for col in range(2):
                     frame_rect = pygame.Rect(col * frame_width, row * frame_height, frame_width, frame_height)

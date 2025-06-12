@@ -1,3 +1,0 @@
-Strategy,Algorithm,Avg Time (ms),Avg Path Tiles,Avg Branch Points,Avg Cleaned Tiles
-Reasonable,Original,0.374,55.1,23.5,0.0
-Reasonable,Optimized,0.749,49.6,20.3,5.5

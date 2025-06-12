@@ -1,8 +1,12 @@
+"""
+AI assisted code included in this file, you can see the comments below for details.
+"""
 import pygame
 import math
 from abc import ABC, abstractmethod
 from settings import *
 from audio_manager import audio_manager
+from resource_manager import get_bullet_path
 
 
 class DamageEffect(ABC):
@@ -10,7 +14,6 @@ class DamageEffect(ABC):
     
     @abstractmethod
     def apply(self, enemy, damage, position):
-        """Apply the effect to an enemy"""
         pass
 
 
@@ -18,7 +21,6 @@ class NormalDamageEffect(DamageEffect):
     """Normal damage with no special effects"""
     
     def apply(self, enemy, damage, position):
-        """Apply normal damage"""
         if hasattr(enemy, 'hit') and callable(enemy.hit):
             return enemy.hit(damage)
         return True
@@ -28,51 +30,40 @@ class BurnDamageEffect(DamageEffect):
     """Burn damage that applies damage over time"""
     
     def apply(self, enemy, damage, position):
-        """Apply burn damage and effect"""
-        # Apply initial damage
         result = True
         if hasattr(enemy, 'hit') and callable(enemy.hit):
             result = enemy.hit(damage)
-        
-        # Add burn effect
+
         if result is not False:  # If not dodged
             self._add_burn_effect(enemy)
         
         return result
     
     def _add_burn_effect(self, enemy):
-        """Add burn effect to enemy"""
-        # Check if enemy already has burn effect
         if not hasattr(enemy, 'burn_effects'):
             enemy.burn_effects = []
-        
-        # Add new burn effect
         burn_effect = BurnEffect(enemy.rect.center)
         enemy.burn_effects.append(burn_effect)
-        
-        # Play flame sound effect
         audio_manager.play_flame_sound()
 
 
 class ElectricDamageEffect(DamageEffect):
     """Electric damage that affects nearby enemies"""
+    """This class is fixed by ChatGPT-o4-mini-high, the code is directly copied from the generated code"""
     
     def __init__(self, aoe_range=40):
         self.aoe_range = aoe_range
-        self.enemies_group = None  # Will be set by game
+        self.enemies_group = None
     
     def set_enemies_group(self, enemies_group):
         """Set the enemies group for chain damage"""
         self.enemies_group = enemies_group
     
     def apply(self, enemy, damage, position):
-        """Apply electric damage and chain effect"""
-        # Apply primary damage
         result = True
         if hasattr(enemy, 'hit') and callable(enemy.hit):
             result = enemy.hit(damage)
-        
-        # Add electric effect
+
         if result is not False:  # If not dodged
             self._add_electric_effect(enemy)
             if self.enemies_group:
@@ -81,7 +72,6 @@ class ElectricDamageEffect(DamageEffect):
         return result
     
     def _add_electric_effect(self, enemy):
-        """Add electric visual effect"""
         if not hasattr(enemy, 'electric_effects'):
             enemy.electric_effects = []
         
@@ -122,24 +112,21 @@ class ElectricDamageEffect(DamageEffect):
 
 
 class BurnEffect:
-    """Visual and damage effect for burning enemies"""
-    
+    """This class is fixed by ChatGPT-o4-mini-high, the font size is increased to 32 for better visibility, no more code changes by ChatGPT"""
     def __init__(self, pos):
         self.pos = pos
-        self.timer = 3.0  # Show for 3 seconds
-        self.damage_timer = 1.0  # Deal damage every second
+        self.timer = 3.0
+        self.damage_timer = 1.0
         self.font = pygame.font.SysFont('Arial', 32, bold=True)  # 2x larger (16 -> 32)
         self.text = self.font.render("Fire", True, (255, 0, 0))
         self.offset_y = 0
         self.damage_per_tick = 5
     
     def update(self, dt, enemy):
-        """Update burn effect and apply damage"""
         self.timer -= dt
         self.damage_timer -= dt
-        self.offset_y += 10 * dt  # Float upward slowly
-        
-        # Apply damage every second
+        self.offset_y += 10 * dt
+
         if self.damage_timer <= 0:
             if hasattr(enemy, 'hit') and callable(enemy.hit):
                 enemy.hit(self.damage_per_tick)
@@ -148,7 +135,7 @@ class BurnEffect:
         return self.timer > 0
     
     def draw(self, screen):
-        """Draw burn effect"""
+
         if self.timer > 0:
             alpha = min(255, int(self.timer * 85))  # Fade out over 3 seconds
             text_surface = self.text.copy()
@@ -161,7 +148,7 @@ class BurnEffect:
 
 class ElectricEffect:
     """Visual effect for electric attacks"""
-    
+    """This class is fixed by ChatGPT-o4-mini-high, the font size is increased to 32 for better visibility, no more code changes by ChatGPT"""
     def __init__(self, pos):
         self.pos = pos
         self.timer = 0.5  # Show for 0.5 seconds
@@ -170,13 +157,11 @@ class ElectricEffect:
         self.offset_y = 0
     
     def update(self, dt):
-        """Update electric effect"""
         self.timer -= dt
         self.offset_y += 30 * dt  # Float upward quickly
         return self.timer > 0
     
     def draw(self, screen):
-        """Draw electric effect"""
         if self.timer > 0:
             alpha = min(255, int(self.timer * 510))  # Fade out quickly
             text_surface = self.text.copy()
@@ -192,12 +177,10 @@ class BulletStrategy(ABC):
     
     @abstractmethod
     def create_image(self, bullet_type):
-        """Create bullet image"""
         pass
     
     @abstractmethod
     def get_damage_effect(self):
-        """Get damage effect for this bullet type"""
         pass
 
 
@@ -211,17 +194,16 @@ class NormalBulletStrategy(BulletStrategy):
         """Create normal bullet image"""
         try:
             image = pygame.image.load(self.bullet_image_path)
-            # Scale to appropriate size (2.5x larger)
             image = pygame.transform.scale(image, (40, 40))
             return image
         except (pygame.error, FileNotFoundError):
+            """This error handling is fixed by ChatGPT-o4-mini-high, the fallback image is now a simple colored circle"""
             # Fallback to simple colored circle
             image = pygame.Surface((30, 30), pygame.SRCALPHA)
             pygame.draw.circle(image, (100, 100, 100), (15, 15), 15)
             return image
     
     def get_damage_effect(self):
-        """Get normal damage effect"""
         return NormalDamageEffect()
 
 
@@ -232,20 +214,18 @@ class FireBulletStrategy(BulletStrategy):
         self.bullet_image_path = bullet_image_path
     
     def create_image(self, bullet_type):
-        """Create fire bullet image"""
         try:
             image = pygame.image.load(self.bullet_image_path)
-            # Scale to appropriate size (2.5x larger)
             image = pygame.transform.scale(image, (40, 40))
             return image
         except (pygame.error, FileNotFoundError):
+            """This error handling is fixed by ChatGPT-o4-mini-high, the fallback image is now a simple colored circle"""
             # Fallback to fire-colored circle
             image = pygame.Surface((30, 30), pygame.SRCALPHA)
             pygame.draw.circle(image, (255, 100, 0), (15, 15), 15)
             return image
     
     def get_damage_effect(self):
-        """Get burn damage effect"""
         return BurnDamageEffect()
 
 
@@ -256,20 +236,19 @@ class ElectricBulletStrategy(BulletStrategy):
         self.bullet_image_path = bullet_image_path
     
     def create_image(self, bullet_type):
-        """Create electric bullet image"""
         try:
             image = pygame.image.load(self.bullet_image_path)
             # Scale to appropriate size (2.5x larger)
             image = pygame.transform.scale(image, (40, 40))
             return image
         except (pygame.error, FileNotFoundError):
+            """This error handling is fixed by ChatGPT-o4-mini-high, the fallback image is now a simple colored circle"""
             # Fallback to electric-colored circle
             image = pygame.Surface((30, 30), pygame.SRCALPHA)
             pygame.draw.circle(image, (255, 255, 100), (15, 15), 15)
             return image
     
     def get_damage_effect(self):
-        """Get electric damage effect"""
         return ElectricDamageEffect()
 
 
@@ -277,19 +256,17 @@ class BulletFactory:
     """Factory for creating different bullet types"""
     
     _strategies = {
-        'Emberwing': FireBulletStrategy('assets/bullet/Emberwing.png'),
-        'Volt Cow': ElectricBulletStrategy('assets/bullet/Volt Cow.png'),
-        'Banana Blaster': NormalBulletStrategy('assets/bullet/Banana Blaster.png'),
-        'Wood Sage': NormalBulletStrategy('assets/bullet/Wood Sage.png'),
+        'Emberwing': FireBulletStrategy(str(get_bullet_path('Emberwing.png'))),
+        'Volt Cow': ElectricBulletStrategy(str(get_bullet_path('Volt Cow.png'))),
+        'Banana Blaster': NormalBulletStrategy(str(get_bullet_path('Banana Blaster.png'))),
+        'Wood Sage': NormalBulletStrategy(str(get_bullet_path('Wood Sage.png'))),
     }
     
     @classmethod
     def create_bullet(cls, tower_name, start_pos, target, damage, enemies_group=None):
-        """Create a bullet for a specific tower type"""
         strategy = cls._strategies.get(tower_name, NormalBulletStrategy(''))
         bullet = Bullet(start_pos, target, damage, strategy, tower_name)
-        
-        # Set enemies group for electric bullets
+
         if tower_name == 'Volt Cow' and hasattr(bullet.damage_effect, 'set_enemies_group'):
             bullet.damage_effect.set_enemies_group(enemies_group)
         
@@ -303,49 +280,38 @@ class Bullet(pygame.sprite.Sprite):
         super().__init__()
         self.strategy = strategy
         self.bullet_type = bullet_type
-        
-        # Create base image
+
         self.base_image = strategy.create_image(bullet_type)
         self.image = self.base_image.copy()
-        
-        # Position and movement
+
         self.rect = self.image.get_rect(center=start_pos)
         self.pos = pygame.Vector2(self.rect.center)
         self.target = target
         self.speed = 300
         self.damage = damage
-        
-        # Calculate direction
+
         vec = pygame.Vector2(target.rect.center) - pygame.Vector2(start_pos)
         self.dir = vec.normalize() if vec.length() else pygame.Vector2()
-        
-        # Rotation
+
         self.rotation = 0
-        self.rotation_speed = 360  # degrees per second
-        
-        # Damage effect
+        self.rotation_speed = 360
+
         self.damage_effect = strategy.get_damage_effect()
     
     def update(self, dt):
         """Update bullet position and rotation"""
-        # Move bullet
         self.pos += self.dir * self.speed * dt
         self.rect.center = self.pos
-        
-        # Rotate bullet
+
         self.rotation += self.rotation_speed * dt
         self.rotation %= 360
-        
-        # Update image with rotation
+
         self.image = pygame.transform.rotate(self.base_image, self.rotation)
         old_center = self.rect.center
         self.rect = self.image.get_rect()
         self.rect.center = old_center
-        
-        # Check collision with target
+
         if self.rect.colliderect(self.target.rect):
-            # Apply damage effect
             hit_result = self.damage_effect.apply(self.target, self.damage, self.rect.center)
-            
-            # Remove bullet regardless of hit/miss
+
             self.kill()

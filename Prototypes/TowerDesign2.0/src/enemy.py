@@ -1,3 +1,6 @@
+"""
+AI assisted code included in this file, you can see the comments below for details.
+"""
 import pygame
 import os
 import math
@@ -5,6 +8,7 @@ import random
 from settings import *
 from pathfinding import a_star
 from grid import GRID_MAP
+from resource_manager import get_sprite_path
 
 # Enemy type definitions
 ENEMY_TYPES = {
@@ -13,6 +17,7 @@ ENEMY_TYPES = {
         'health': 120,
         'speed': 90,
         'reward': 2,
+        'damage_to_base': 1,
         'description': 'Fast enemy with low health'
     },
     'Cementum': {
@@ -20,6 +25,7 @@ ENEMY_TYPES = {
         'health': 400,
         'speed': 30,
         'reward': 5,
+        'damage_to_base': 2,
         'description': 'Slow tank enemy with high health'
     },
     'Adframe': {
@@ -28,6 +34,7 @@ ENEMY_TYPES = {
         'speed': 50,
         'reward': 3,
         'dodge_chance': 0.3,
+        'damage_to_base': 1,
         'description': 'Enemy that can dodge attacks'
     },
     'Boxshot': {
@@ -35,6 +42,7 @@ ENEMY_TYPES = {
         'health': 160,
         'speed': 50,  
         'reward': 2,
+        'damage_to_base': 1,
         'description': 'Standard enemy'
     },
     'Wiregeist': {
@@ -44,24 +52,26 @@ ENEMY_TYPES = {
         'reward': 4,
         'aura_range': 2,
         'speed_boost': 0.2,
+        'damage_to_base': 1,
         'description': 'Boosts nearby enemy speed by 20%'
     }
 }
 
 class EnemySprite:
     """Handles enemy sprite loading and animation"""
+    """This class is inspired by ChatGPT-o4-mini-high, however only a little number of code is directly copied from the generated code"""
     def __init__(self, enemy_name):
         self.enemy_name = enemy_name
         self.frames = []
         self.current_frame = 0
         self.animation_timer = 0.0
-        self.frame_duration = 0.3  # 0.3 seconds per frame for walking animation
+        self.frame_duration = 0.3
         
         # Load sprite sheet
-        sprite_path = f"assets/sprite/enemy/{enemy_name}.png"
+        sprite_path = get_sprite_path("enemy", f"{enemy_name}.png")
         try:
-            if os.path.exists(sprite_path):
-                self.sprite_sheet = pygame.image.load(sprite_path)
+            if sprite_path.exists():
+                self.sprite_sheet = pygame.image.load(str(sprite_path))
                 self.load_frames()
                 print(f"Loaded sprite for {enemy_name}")
             else:
@@ -72,7 +82,6 @@ class EnemySprite:
             self.create_fallback_frames()
     
     def load_frames(self):
-        """Load 4 frames from sprite sheet (assuming 4x1 or 2x2 grid)"""
         if not self.sprite_sheet:
             return
             
@@ -89,7 +98,7 @@ class EnemySprite:
                 frame = self.sprite_sheet.subsurface(frame_rect).copy()
                 self.frames.append(frame)
         else:
-            # Try 2x2 layout
+            """This error handling is inspired by ChatGPT-o4-mini-high, however no code is directly copied from the generated code, it is useless for current implementation, but left for future expansion"""
             frame_width = sheet_width // 2
             frame_height = sheet_height // 2
             
@@ -101,6 +110,7 @@ class EnemySprite:
     
     def create_fallback_frames(self):
         """Create simple colored rectangles as fallback"""
+        """This method is fixed by ChatGPT-o4-mini-high, the code is directly copied from the generated code"""
         # Get enemy color based on type
         enemy_colors = {
             'Caffeinj': (0, 255, 0),      # Green for fast
@@ -132,30 +142,27 @@ class EnemySprite:
             self.frames.append(frame)
     
     def get_current_frame(self):
-        """Get current animation frame"""
         if self.frames:
             return self.frames[self.current_frame % len(self.frames)]
         return pygame.Surface((32, 32))
     
     def update_animation(self, dt):
-        """Update animation timer and frame"""
         self.animation_timer += dt
         if self.animation_timer >= self.frame_duration:
             self.animation_timer = 0.0
             self.current_frame = (self.current_frame + 1) % 4
 
 class MissEffect:
-    """Visual effect for missed attacks"""
     def __init__(self, pos):
         self.pos = pos
-        self.timer = 1.0  # Show for 1 second
+        self.timer = 1.0
         self.font = pygame.font.SysFont('Arial', 32, bold=True)  # 2x larger (16 -> 32)
         self.text = self.font.render("MISS", True, (255, 255, 0))
         self.offset_y = 0
     
     def update(self, dt):
         self.timer -= dt
-        self.offset_y += 20 * dt  # Float upward
+        self.offset_y += 20 * dt
         return self.timer > 0
     
     def draw(self, screen):
@@ -163,7 +170,6 @@ class MissEffect:
             alpha = min(255, int(self.timer * 255))
             text_surface = self.text.copy()
             text_surface.set_alpha(alpha)
-            # Adjust position for larger text
             text_rect = text_surface.get_rect()
             pos = (self.pos[0] - text_rect.width//2, self.pos[1] - 30 - self.offset_y)
             screen.blit(text_surface, pos)
@@ -182,16 +188,14 @@ class BaseEnemy(pygame.sprite.Sprite):
             else:
                 raise ValueError("Invalid path provided!")
         else:
-            # Calculate path using current grid for each enemy individually
             self.path = a_star(path_or_start, end, GRID_MAP)
             if not self.path:
                 raise ValueError("No path found!")
-        
-        # Get enemy stats
+
         self.enemy_type = enemy_type
+        # using get() to handle unknown enemy types gracefully
         enemy_stats = ENEMY_TYPES.get(enemy_type, ENEMY_TYPES['Boxshot'])
-        
-        # Basic properties
+
         self.step = 0
         self.path_index = 0
         self.progress = 0.0
@@ -202,44 +206,38 @@ class BaseEnemy(pygame.sprite.Sprite):
         self.hp = self.max_health
         self.max_hp = self.max_health
         self.reward = enemy_stats['reward']
-        
-        # Visual effects
+
         self.flash_time = 0.0
         self.hit_flash = 0.0
         self.reached_end = False
-        self.damage_to_base = 1
+        self.damage_to_base = enemy_stats.get('damage_to_base', 1)
         self.is_dead = False
         self.reward_given = False
         
         # Speed modifiers tracking
         self.speed_modifiers = set()
-        self.aura_effects = []  # Track aura effects affecting this enemy
-        
-        # Load sprite and animation
+        self.aura_effects = []
+
         self.sprite = EnemySprite(enemy_type)
         
-        # Size and image setup
+
         self.base_size = 36  # Increased from 30 to 36 for slightly larger enemies
         self.size = self.base_size
         self.image = self.get_scaled_image()
         self.rect = self.image.get_rect()
-        
-        # Set initial position
+
         self._update_position_and_size()
         if self.path:
             gx, gy = self.path[0]
             initial_pos = self._tile_center(gx, gy)
             self.rect.center = (initial_pos.x, initial_pos.y)
-        
-        # Miss effects
+
         self.miss_effects = []
-        
-        # Special effects
         self.burn_effects = []
         self.electric_effects = []
 
     def get_scaled_image(self):
-        """Get current frame scaled to appropriate size"""
+        """This method is fixed by ChatGPT-4o"""
         current_frame = self.sprite.get_current_frame()
         screen = pygame.display.get_surface()
         if screen:
@@ -253,7 +251,6 @@ class BaseEnemy(pygame.sprite.Sprite):
         return pygame.transform.scale(current_frame, (size, size))
     
     def _update_position_and_size(self):
-        """Update enemy size and position based on current screen scaling"""
         screen = pygame.display.get_surface()
         if screen:
             screen_w, screen_h = screen.get_size()
@@ -264,6 +261,7 @@ class BaseEnemy(pygame.sprite.Sprite):
             self.image = self.get_scaled_image()
             
             # Recalculate position based on current path progress
+            # This part is generated by ChatGPT-4o, the code is directly copied.
             if self.step < len(self.path):
                 if self.step + 1 < len(self.path):
                     current_gx, current_gy = self.path[self.step]
@@ -286,7 +284,6 @@ class BaseEnemy(pygame.sprite.Sprite):
                 self.rect = self.image.get_rect()
 
     def _tile_center(self, gx, gy):
-        """Get the center point of a grid tile with proper scaling"""
         screen = pygame.display.get_surface()
         if screen:
             screen_w, screen_h = screen.get_size()
@@ -322,46 +319,35 @@ class BaseEnemy(pygame.sprite.Sprite):
 
     def apply_aura_effect(self, source_enemy, speed_multiplier):
         """Apply speed boost from another enemy's aura"""
-        # Remove any existing effect from the same source
         self.aura_effects = [effect for effect in self.aura_effects if effect[0] != source_enemy]
-        
-        # Add new effect
+
         self.aura_effects.append((source_enemy, speed_multiplier))
         self._recalculate_speed()
     
     def remove_aura_effect(self, source_enemy):
-        """Remove speed boost from a specific enemy"""
         self.aura_effects = [effect for effect in self.aura_effects if effect[0] != source_enemy]
         self._recalculate_speed()
     
     def _recalculate_speed(self):
-        """Recalculate speed based on all active effects"""
         base_speed = self.original_speed
-        
-        # Apply tower slow effects
+
         if hasattr(self, 'is_slowed') and self.is_slowed and hasattr(self, 'slowing_tower'):
             base_speed *= 0.75  # 25% slow from towers
-        
-        # Apply aura effects (multiplicative)
+
         for source_enemy, multiplier in self.aura_effects:
             base_speed *= (1 + multiplier)
         
         self.speed = base_speed
 
     def update(self, dt):
-        # Update animation
         self.sprite.update_animation(dt)
-        
-        # Update size and position
+
         self._update_position_and_size()
-        
-        # Update miss effects
+
         self.miss_effects = [effect for effect in self.miss_effects if effect.update(dt)]
-        
-        # Update burn effects
+
         self.burn_effects = [effect for effect in self.burn_effects if effect.update(dt, self)]
-        
-        # Update electric effects
+
         self.electric_effects = [effect for effect in self.electric_effects if effect.update(dt)]
         
         # Movement logic
@@ -407,11 +393,9 @@ class BaseEnemy(pygame.sprite.Sprite):
             self.hit_flash = max(0, self.hit_flash - dt)
     
     def add_miss_effect(self):
-        """Add a miss effect at current position"""
         self.miss_effects.append(MissEffect(self.rect.center))
     
     def draw(self, surf):
-        """Draw the enemy with all effects"""
         surf.blit(self.image, self.rect)
         
         # Draw health bar
@@ -441,7 +425,6 @@ class BaseEnemy(pygame.sprite.Sprite):
             effect.draw(surf)
 
 class AdframeEnemy(BaseEnemy):
-    """Enemy that can dodge attacks"""
     def __init__(self, path_or_start, end=None):
         super().__init__(path_or_start, end, 'Adframe')
         self.dodge_chance = ENEMY_TYPES['Adframe']['dodge_chance']
@@ -478,8 +461,7 @@ class WiregeistEnemy(BaseEnemy):
         all_enemies = []
         for group in self.groups():
             all_enemies.extend([enemy for enemy in group if enemy != self and hasattr(enemy, 'rect')])
-        
-        # Calculate scaled range
+
         screen = pygame.display.get_surface()
         if screen:
             screen_w, screen_h = screen.get_size()
@@ -489,8 +471,7 @@ class WiregeistEnemy(BaseEnemy):
             scaled_range = self.aura_range
         
         currently_in_range = set()
-        
-        # Check each enemy
+
         for enemy in all_enemies:
             distance_sq = (self.rect.centerx - enemy.rect.centerx)**2 + (self.rect.centery - enemy.rect.centery)**2
             
@@ -498,8 +479,7 @@ class WiregeistEnemy(BaseEnemy):
                 currently_in_range.add(enemy)
                 if enemy not in self.affected_enemies:
                     enemy.apply_aura_effect(self, self.speed_boost)
-        
-        # Remove effects from enemies that left range
+
         enemies_to_remove = self.affected_enemies - currently_in_range
         for enemy in enemies_to_remove:
             enemy.remove_aura_effect(self)
@@ -533,6 +513,7 @@ class EnemyFactory:
             enemy.health = enemy.max_health
         
         # Debug print for enemy health (for all waves)
+        # TODO: Add into log file.
         print(f"Wave {wave_number}: {enemy_type} - Base Health: {ENEMY_TYPES[enemy_type]['health']}, "
               f"Scaled Health: {enemy.health} (multiplier: {health_multiplier:.1f})")
         
@@ -555,7 +536,6 @@ class EnemyFactory:
         
         return composition
 
-# Legacy classes for backward compatibility
 class Enemy(BaseEnemy):
     """Legacy enemy class - redirects to BaseEnemy"""
     def __init__(self, path_or_start, end=None, enemy_type='Boxshot'):

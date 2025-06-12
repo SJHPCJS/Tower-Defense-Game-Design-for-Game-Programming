@@ -1,3 +1,6 @@
+"""
+AI assisted code included in this file, you can see the comments below for details.
+"""
 import pygame
 import json
 import os
@@ -11,6 +14,7 @@ from settings import *
 from pathfinding import a_star
 from audio_manager import audio_manager
 from abc import ABC, abstractmethod
+from resource_manager import get_tiles_path
 
 class PathGenerationStrategy(ABC):
     """Abstract base class for path generation strategies"""
@@ -22,7 +26,6 @@ class PathGenerationStrategy(ABC):
     
     @abstractmethod
     def get_algorithm_name(self) -> str:
-        """Get the name of the algorithm"""
         pass
 
 class TowerPathStrategy(PathGenerationStrategy):
@@ -33,8 +36,7 @@ class TowerPathStrategy(PathGenerationStrategy):
         path = {level_creator.spawn}
         x, y = level_creator.spawn
         max_steps = GRID_W * GRID_H * 4
-        
-        # Generate main path to HOME
+
         while (x, y) != level_creator.home and len(path) < max_steps:
             dirs = list(level_creator.neighbors4(x, y))
             random.shuffle(dirs)
@@ -54,8 +56,7 @@ class TowerPathStrategy(PathGenerationStrategy):
                 path.add((x,y))
         
         path.add(level_creator.home)
-        
-        # Create initial grid
+
         temp_grid = [[1]*GRID_W for _ in range(GRID_H)]
         for px, py in path:
             temp_grid[py][px] = 0
@@ -80,6 +81,7 @@ class TowerPathStrategy(PathGenerationStrategy):
             useful_nodes = level_creator.find_all_reasonable_path_nodes(temp_grid, level_creator.spawn, level_creator.home, tolerance=3)
         
         # Clean up useless path tiles
+        # Very important to avoid leaving useless paths
         for y in range(GRID_H):
             for x in range(GRID_W):
                 if temp_grid[y][x] == 0 and (x, y) not in useful_nodes:
@@ -204,6 +206,7 @@ class OrganicPathsStrategy(PathGenerationStrategy):
         return "Organic Paths"
 
 class LevelCreator:
+    """This class is optimized by ChaGPT o4-mini-high, but it is not a complete rewrite."""
     def __init__(self):
         self.grid = [[1 for _ in range(GRID_W)] for _ in range(GRID_H)]  # 1 = grass, 0 = path
         self.spawn = (0, 0)
@@ -273,16 +276,17 @@ class LevelCreator:
         
     def _load_tile_images(self):
         """Load tile images for rendering"""
+        """Load tile images with error handling"""
         try:
-            assets_path = Path(__file__).parent.parent / 'assets' / 'tiles'
-            self.path_img = pygame.image.load(assets_path / 'path.png')
-            self.grass_img = pygame.image.load(assets_path / 'grass.png')
-            self.path_img = pygame.transform.scale(self.path_img, (GRID_SIZE, GRID_SIZE))
-            self.grass_img = pygame.transform.scale(self.grass_img, (GRID_SIZE, GRID_SIZE))
-        except:
-            # Fallback to colored rectangles
-            self.path_img = None
-            self.grass_img = None
+            self.path_img = pygame.image.load(str(get_tiles_path('path.png')))
+            self.grass_img = pygame.image.load(str(get_tiles_path('grass.png')))
+        except Exception as e:
+            print(f"Failed to load tile images: {e}")
+            # Create fallback images
+            self.path_img = pygame.Surface((32, 32))
+            self.path_img.fill((139, 69, 19))  # Brown for path
+            self.grass_img = pygame.Surface((32, 32))
+            self.grass_img.fill((34, 139, 34))  # Green for grass
     
     def neighbors4(self, x: int, y: int, w: int = GRID_W, h: int = GRID_H):
         """Get 4-directional neighbors within grid bounds"""
@@ -575,7 +579,7 @@ class LevelCreator:
         dialog_x = (screen_w - dialog_w) // 2
         dialog_y = (screen_h - dialog_h) // 2
         
-        # Input fields (match format in draw method)
+        # Input fields !!! match format in draw method
         field_configs = [
             ('Level Name:', 'name', dialog_y + 100),
             ('Initial Money:', 'initial_money', dialog_y + 150),
@@ -632,9 +636,7 @@ class LevelCreator:
                 message = "AI generated path successfully!"
             
             self.grid = new_grid
-            
-            # Keep original spawn and home positions instead of finding new ones
-            # Only ensure they are set as path tiles
+
             self.spawn = original_spawn
             self.home = original_home
             self.grid[self.spawn[1]][self.spawn[0]] = 0  # Ensure spawn is path
@@ -646,7 +648,6 @@ class LevelCreator:
     
     def find_best_start_point(self):
         """Find the best start point in the current grid"""
-        # Look for path tiles in the first row or first column
         for x in range(GRID_W):
             if self.grid[0][x] == 0:
                 return (x, 0)
@@ -675,18 +676,15 @@ class LevelCreator:
     def save_level_with_settings(self):
         """Save the level with all settings"""
         try:
-            # Validate name
             if not self.settings_inputs['name'].strip():
                 self.show_message("Please enter a level name!", UI_DANGER)
                 return False
-            
-            # Parse settings from input fields
+
             initial_money = int(self.settings_inputs['initial_money'] or 100)
             wave_count = int(self.settings_inputs['wave_count'] or 5)
             enemy_speed = int(self.settings_inputs['enemy_speed'] or 50)
             base_hp = int(self.settings_inputs['base_hp'] or 10)
-            
-            # Validate settings
+
             if initial_money < 0:
                 initial_money = 100
             if wave_count < 1:
@@ -766,6 +764,7 @@ class LevelCreator:
 
     def draw_complete_save_dialog(self, screen, screen_w, screen_h):
         """Draw the complete save dialog with Forest Guard theme"""
+        """Optimized with ChatGPT o4-mini-high"""
         dialog_w, dialog_h = 600, 580  # increased height to accommodate new fields
         dialog_x = (screen_w - dialog_w) // 2
         dialog_y = (screen_h - dialog_h) // 2
