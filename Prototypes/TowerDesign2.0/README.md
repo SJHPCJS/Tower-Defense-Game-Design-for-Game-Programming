@@ -1,5 +1,7 @@
 # Forest Guard 2.0 – Project Overview & Quick Start
 ## Market-Ready Tower Defence Game
+> 🧩 [Download Forest Guard 2.0 Release (.exe)](https://github.com/SJHPCJS/Tower-Defense-Game-Design-for-Game-Programming/releases/latest) – No install needed, just double-click!
+
 
 > “Nature will fight back… and it’s counting on you!”
 

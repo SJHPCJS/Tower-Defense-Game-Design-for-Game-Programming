@@ -3,6 +3,8 @@
 This repository contains the full development record of **Forest Guard**, a modular tower-defense game created for the *DI32002 - Games Programming ( SEM 2 24/25 ).  You will find the playable source code, early prototypes, AI experiments, and design documentation all in one place.
 
 > Latest stable build: **`Prototypes/TowerDesign2.0`** (codename *Forest Guard v2.0*)
+> > 🧩 [Download Forest Guard 2.0 Release (.exe)](https://github.com/SJHPCJS/Tower-Defense-Game-Design-for-Game-Programming/releases/latest) – No install needed, just double-click!
+
 
 ---
 
